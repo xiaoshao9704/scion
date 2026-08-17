@@ -1,14 +1,50 @@
 {
-  "name": "@scion/cli",
+  "name": "@crowley/scion",
   "version": "0.1.0",
+  "description": "Convert AI-coding-agent plugin packages between Claude Code, Codex and Kimi, reporting exactly what the move costs",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "kimi",
+    "kimi-code",
+    "plugin",
+    "marketplace",
+    "mcp",
+    "skills",
+    "agent",
+    "converter",
+    "cli"
+  ],
+  "homepage": "https://github.com/xiaoshao9704/scion#readme",
+  "bugs": {
+    "url": "https://github.com/xiaoshao9704/scion/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiaoshao9704/scion.git"
+  },
+  "license": "MIT",
+  "author": "xiaoshao9704 (https://github.com/xiaoshao9704)",
   "type": "module",
-  "bin": { "scion": "dist/cli.js" },
-  "files": ["dist"],
-  "engines": { "node": ">=20" },
+  "bin": {
+    "scion": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm run test"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",
