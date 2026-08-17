@@ -1,0 +1,36 @@
+{
+  "name": "metrics-mcp-server",
+  "version": "1.2.1",
+  "description": "Monitoring toolkit: collector configs, alert rules and events, logs, traces, metric series and dashboards",
+  "author": {
+    "name": "example-team"
+  },
+  "keywords": [
+    "monitoring",
+    "alarm",
+    "logs",
+    "trace",
+    "mcp",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Metrics MCP Server",
+    "shortDescription": "Query, configure and troubleshoot a monitoring platform",
+    "longDescription": "Query collector configs, alert rules and events, logs, traces, metric series and dashboards through the Metrics MCP server, with standardized troubleshooting and configuration playbooks.",
+    "developerName": "example-team",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Investigate the recent production alerts for this service",
+      "Query the logs and traces for this service",
+      "Create collector configs and alert rules for this service"
+    ],
+    "brandColor": "#FF7D00",
+    "screenshots": []
+  }
+}

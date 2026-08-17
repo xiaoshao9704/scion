@@ -1,0 +1,44 @@
+{
+  "name": "metrics-mcp-server",
+  "interface": {
+    "displayName": "Metrics MCP Server"
+  },
+  "plugins": [
+    {
+      "name": "metrics-mcp-server",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/example-org/metrics-mcp-server.git"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "42crunch-api-security-testing",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/42Crunch-AI/claude-plugins.git",
+        "path": "plugins/api-security-testing",
+        "ref": "v1.5.5",
+        "sha": "30287f5e3f122a646d1ac5ca3ab96e130c52a3ad"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "agent-sdk-dev",
+      "source": "./plugins/agent-sdk-dev",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "observe": {
+      "command": "npx",
+      "args": ["-y", "@example-org/metrics-mcp-server@^1"]
+    }
+  }
+}

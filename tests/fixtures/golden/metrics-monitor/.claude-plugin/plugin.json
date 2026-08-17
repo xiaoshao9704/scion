@@ -1,0 +1,9 @@
+{
+  "name": "metrics-monitor",
+  "description": "Monitoring toolkit: collector configs, alert rules/events, log search, trace queries, metric series and dashboards, plus a usage guide skill",
+  "author": {
+    "name": "example-org"
+  },
+  "repository": "https://github.com/example-org/metrics-mcp-server.git",
+  "license": "UNLICENSED"
+}

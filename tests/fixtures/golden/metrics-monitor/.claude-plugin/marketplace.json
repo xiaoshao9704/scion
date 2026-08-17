@@ -1,0 +1,17 @@
+{
+  "name": "metrics-mcp-server",
+  "owner": {
+    "name": "example-team"
+  },
+  "metadata": {
+    "description": "Monitoring platform MCP server plugin marketplace"
+  },
+  "plugins": [
+    {
+      "name": "metrics-monitor",
+      "source": "./",
+      "description": "Monitoring toolkit: collector configs, alert rules/events, log search, trace queries, metric series and dashboards, plus a usage guide skill",
+      "category": "monitoring"
+    }
+  ]
+}
