@@ -1,5 +1,5 @@
 {
-  "name": "@crowley/scion",
+  "name": "@xiaoshao9704/scion",
   "version": "0.1.0",
   "description": "Convert AI-coding-agent plugin packages between Claude Code, Codex and Kimi, reporting exactly what the move costs",
   "keywords": [

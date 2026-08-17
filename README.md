@@ -4,7 +4,7 @@ Convert an agent plugin package between Claude Code, Codex and Kimi Code — and
 say out loud what the move costs.
 
 ```bash
-npx @crowley/scion install owner/repo --to kimi
+npx @xiaoshao9704/scion install owner/repo --to kimi
 ```
 
 ## The problem this solves
@@ -28,10 +28,10 @@ reporting every field that could not survive the trip intact.
 ## Install
 
 ```bash
-npm install -g @crowley/scion
+npm install -g @xiaoshao9704/scion
 ```
 
-Node 20+. Or run it without installing: `npx @crowley/scion <command>`.
+Node 20+. Or run it without installing: `npx @xiaoshao9704/scion <command>`.
 
 ## Commands
 
