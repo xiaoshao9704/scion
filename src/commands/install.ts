@@ -7,7 +7,7 @@ import type { Runner } from '../install/exec.js';
 import { normalize, isSafePathSegment } from '../normalize/index.js';
 import { loadProfile } from '../profiles/loader.js';
 import { doctor, worstLevel } from '../doctor/index.js';
-import { formatFindings } from '../doctor/report.js';
+import { formatEnvVars, formatFindings } from '../doctor/report.js';
 import {
   PinRejectedError,
   resolveSource,
@@ -28,11 +28,12 @@ import { formatPlan, planToJson, type InstallPlan, type Installer } from '../ins
 import { InstallFailedError, formatInstallFailure } from '../install/rollback.js';
 import { identityJson, parseEcosystem } from './doctor.js';
 import { usageError, writeResult, type CommandResult } from '../output/result.js';
-import { recordInstall } from '../install/state.js';
+import { readState, recordInstall } from '../install/state.js';
 import { EnvNameError, parseEnvNames } from '../mcp/env-flag.js';
+import type { EnvVarUse } from '../mcp/env.js';
 
 const USAGE =
-  'usage: scion install <github|path|zip|<plugin>@<marketplace>> --to kimi[,codex] [--yes] [--write-registry] [--keep-env-names] [--env-name OLD=NEW] [--dry-run [--json]]\n';
+  'usage: scion install <github|path|zip|<plugin>@<marketplace>> --to kimi[,codex] [--yes] [--write-registry] [--env-name OLD=NEW] [--dry-run [--json]]\n';
 
 export interface InstallDeps {
   home?: string;
@@ -43,6 +44,8 @@ export interface InstallDeps {
 interface TargetReport {
   target: EcosystemId;
   findings: Finding[];
+  /** 这个插件要读哪些环境变量、各自被怎么处理了 */
+  envVars: EnvVarUse[];
   plan?: InstallPlan;
 }
 
@@ -71,6 +74,8 @@ interface InstallReport {
   stoppedAt?: Stop;
   /** dry-run 专有：有 LOSS 但没给 --yes，预览照出，真装时还得补 --yes */
   needsYes: boolean;
+  /** 这次没给 --env-name，沿用了账本里记着的映射（OLD=NEW 形态） */
+  reusedEnvNames?: string[];
   via?: MarketResolution;
 }
 
@@ -87,7 +92,6 @@ export async function runInstall(
       yes: { type: 'boolean', default: false },
       'write-registry': { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
-      'keep-env-names': { type: 'boolean', default: false },
       'env-name': { type: 'string', multiple: true },
       json: { type: 'boolean', default: false },
     },
@@ -201,18 +205,27 @@ export async function runInstall(
 
   // dry-run 遇到 LOSS 不停：什么都不做的预览没有需要用户承诺的损耗，把预览挡在
   // --yes 后面等于让用户为了看一眼先盲目同意。真正安装时仍然要 --yes，末尾补一行提醒。
-  const keepEnvNames = values['keep-env-names'] as boolean;
   let envNames: Map<string, string>;
   try {
-    envNames = parseEnvNames(values['env-name'] as string[] | undefined);
+    envNames = parseEnvNames(values['env-name'] as string[] | undefined, ir.identity.name);
   } catch (err) {
     if (!(err instanceof EnvNameError)) throw err;
     return writeResult(io, json, usageError('install', `${err.message}\n${USAGE}`));
   }
 
+  // 没点名就沿用这个插件上次装成时的映射。改名是插件维度的长期事实：用户照新名字写了
+  // export，重装时若退回作者原名，那行 export 就再也没人读，而插件只会静默连不上。
+  if (envNames.size === 0) {
+    const recorded = await recordedEnvNames(home, ir.identity.name, targets);
+    if (recorded.size > 0) {
+      envNames = recorded;
+      report.reusedEnvNames = [...recorded].map(([previous, next]) => `${previous}=${next}`);
+    }
+  }
+
   for (const target of targets) {
-    const findings = await doctor(ir, loadProfile(target), { keepEnvNames, envNames });
-    report.targets.push({ target, findings });
+    const { findings, envVars } = await doctor(ir, loadProfile(target), { envNames });
+    report.targets.push({ target, findings, envVars });
 
     const worst = worstLevel(findings);
     if (worst === 'BLOCK') {
@@ -235,7 +248,6 @@ export async function runInstall(
     home,
     run: deps.run,
     writeRegistry: values['write-registry'] as boolean,
-    keepEnvNames,
     envNames,
     marketName,
   };
@@ -277,6 +289,7 @@ export async function runInstall(
       sourceKind: resolved.kind,
       pluginRoot: outcome.pluginRoot,
       registered: outcome.registered,
+      ...(envNames.size > 0 ? { envNames: Object.fromEntries(envNames) } : {}),
     });
     io.write(
       `\n[${target}] ${outcome.registered ? 'installed' : 'converted'} → ${outcome.pluginRoot}\n`,
@@ -314,9 +327,18 @@ function installResult(report: InstallReport): CommandResult {
     }
   }
 
+  if (report.reusedEnvNames) {
+    lines.push(
+      `\nReusing the environment-variable names recorded for ${report.plugin.name} at its last install: ` +
+        `${report.reusedEnvNames.join(', ')}\n` +
+        '  Pass --env-name to change them, or --env-name OLD=OLD to go back to the author\'s name.\n',
+    );
+  }
+
   for (const t of report.targets) {
     lines.push(`\n${report.plugin.name} · ${report.from} → ${t.target}\n`);
     lines.push(formatFindings(t.findings));
+    lines.push(formatEnvVars(t.envVars, t.target));
   }
 
   if (report.stoppedAt?.reason === 'block') {
@@ -345,10 +367,12 @@ function installResult(report: InstallReport): CommandResult {
       ...(report.via ? { via: report.via } : {}),
       ...(report.stoppedAt ? { stoppedAt: report.stoppedAt } : {}),
       needsYes: report.needsYes,
+      ...(report.reusedEnvNames ? { reusedEnvNames: report.reusedEnvNames } : {}),
       targets: report.targets.map((t) => ({
         target: t.target,
         worst: worstLevel(t.findings),
         findings: t.findings,
+        envVars: t.envVars,
         ...(t.plan ? { plan: planToJson(t.plan) } : {}),
       })),
     },
@@ -444,6 +468,35 @@ function marketRefError(
       },
     },
   };
+}
+
+/**
+ * 账本里这个插件记着的改名映射。按 (插件, 目标) 存，但读的时候要求所有目标一致——
+ * 变量是从**同一个 shell 环境**读的，同一个插件在 kimi 和 codex 下要用两个不同的名字
+ * 意味着用户得 export 两遍同一个值。真出现分歧就不猜，交回给用户显式指定。
+ */
+async function recordedEnvNames(
+  home: string,
+  plugin: string,
+  targets: EcosystemId[],
+): Promise<Map<string, string>> {
+  const records = (await readState(home)).filter(
+    (r) => r.name === plugin && targets.includes(r.target) && r.envNames,
+  );
+  const merged = new Map<string, string>();
+  for (const record of records) {
+    for (const [previous, next] of Object.entries(record.envNames ?? {})) {
+      const seen = merged.get(previous);
+      if (seen !== undefined && seen !== next) {
+        throw new Error(
+          `the install ledger records two different names for ${plugin}'s ${previous} ("${seen}" and "${next}"); ` +
+            `re-run with --env-name ${previous}=<NAME> to say which one you want`,
+        );
+      }
+      merged.set(previous, next);
+    }
+  }
+  return merged;
 }
 
 function installerFor(target: EcosystemId): Installer {

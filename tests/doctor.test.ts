@@ -14,7 +14,7 @@ describe('doctor', () => {
     const root = await makePluginDir({
       '.claude-plugin/plugin.json': JSON.stringify({ name: 'Metrics Monitor' }),
     });
-    const findings = await doctor(await normalize(root, claude), kimi);
+    const { findings } = await doctor(await normalize(root, claude), kimi);
     expect(findings).toContainEqual(
       expect.objectContaining({ level: 'BLOCK', code: 'kimi.name.pattern' }),
     );
@@ -24,7 +24,7 @@ describe('doctor', () => {
     const root = await makePluginDir({
       '.claude-plugin/plugin.json': JSON.stringify({ name: 'metrics-monitor' }),
     });
-    const findings = await doctor(await normalize(root, claude), kimi);
+    const { findings } = await doctor(await normalize(root, claude), kimi);
     expect(findings.some((f) => f.code === 'kimi.name.pattern')).toBe(false);
   });
 
@@ -33,7 +33,7 @@ describe('doctor', () => {
       '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
       'commands/status.md': '---\ndescription: s\n---\n\nBranch: !`git branch --show-current`\n',
     });
-    const findings = await doctor(await normalize(root, claude), kimi);
+    const { findings } = await doctor(await normalize(root, claude), kimi);
     expect(findings).toContainEqual(
       expect.objectContaining({ level: 'LOSS', code: 'command.inline-bash' }),
     );
@@ -48,7 +48,7 @@ describe('doctor', () => {
       '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
       'agents/reviewer.md': '---\nname: reviewer\ndescription: r\n---\n\nx\n',
     });
-    const findings = await doctor(await normalize(root, claude), codex);
+    const { findings } = await doctor(await normalize(root, claude), codex);
     expect(findings).toContainEqual(
       expect.objectContaining({ level: 'INFO', code: 'codex.agents.unverified' }),
     );
@@ -63,7 +63,7 @@ describe('doctor', () => {
       '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
       'skills/demo/SKILL.md': '---\nname: demo\n---\n\nx\n',
     });
-    const findings = await doctor(await normalize(root, claude));
+    const { findings } = await doctor(await normalize(root, claude));
     expect(findings).toContainEqual(
       expect.objectContaining({ level: 'INFO', code: 'provenance.inferred' }),
     );

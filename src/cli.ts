@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { runDoctor } from './commands/doctor.js';
@@ -83,7 +84,9 @@ function usage(): string {
   ].join('\n');
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+// argv[1] 要先解到真实路径再比：npm 安装出来的 `bin/scion` 是一个指向本文件的符号链接，
+// 拿链接路径去比永远不相等，main 块不执行，CLI 静默退出 0 —— 装完就是个哑巴。
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   runCli(process.argv.slice(2), { write: (s) => process.stdout.write(s) })
     .then((code) => { process.exitCode = code; })
     .catch((err: unknown) => {

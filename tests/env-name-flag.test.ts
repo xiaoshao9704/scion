@@ -64,8 +64,8 @@ async function fixture(): Promise<{ home: string; dir: string }> {
 
 describe('scion install --env-name', () => {
   // 两个 server 共用一个令牌，而这个令牌属于它们背后那台 hub，不属于插件。
-  // 自动消歧只会按插件名加前缀，说不出这件事——所以要能点名。
-  it('uses the name the user picked instead of the plugin-prefixed one', async () => {
+  // 名字归谁只有用户说得清，所以改名只能由他点名。
+  it('uses the name the user picked', async () => {
     const { home, dir } = await fixture();
     const code = await runInstall(
       ['--to', 'kimi', '--yes', '--env-name', 'MCP_TOKEN=ACME_HUB_TOKEN', dir],
@@ -84,13 +84,11 @@ describe('scion install --env-name', () => {
     expect(manifest.mcpServers.beta.bearerTokenEnvVar).toBe('ACME_HUB_TOKEN');
   });
 
-  it('beats --keep-env-names, which is the blunter instrument', async () => {
+  // 这是本工具最容易犯的错：自作主张给变量换个"更安全"的名字，让用户去 export 一个
+  // 上游文档里根本不存在的东西。不给 --env-name 就一个字都不许改。
+  it('changes nothing at all without --env-name', async () => {
     const { home, dir } = await fixture();
-    const code = await runInstall(
-      ['--to', 'kimi', '--yes', '--keep-env-names', '--env-name', 'MCP_TOKEN=ACME_HUB_TOKEN', dir],
-      { write: () => {} },
-      { home },
-    );
+    const code = await runInstall(['--to', 'kimi', '--yes', dir], { write: () => {} }, { home });
     expect(code).toBe(0);
 
     const manifest = JSON.parse(
@@ -99,7 +97,8 @@ describe('scion install --env-name', () => {
         'utf8',
       ),
     );
-    expect(manifest.mcpServers.alpha.bearerTokenEnvVar).toBe('ACME_HUB_TOKEN');
+    expect(manifest.mcpServers.alpha.bearerTokenEnvVar).toBe('MCP_TOKEN');
+    expect(manifest.mcpServers.beta.bearerTokenEnvVar).toBe('MCP_TOKEN');
   });
 
   it('reports the name it actually used, so the export line is correct', async () => {
@@ -115,9 +114,8 @@ describe('scion install --env-name', () => {
     expect(text).not.toContain('DEMO_MCP_TOKEN');
   });
 
-  // 用户点名之后再劝他「用 --keep-env-names 改回去」，等于把他刚下的决定当成一个
-  // 待纠正的默认值；而自动改名时那句退路必须留着。
-  it('does not attribute a user-chosen name to its own namespacing', async () => {
+  // 用户点名之后别再劝他这个名字太泛——他刚做完这个决定。没点名时那条提示要在。
+  it('states what it did with each name, and judges none of them', async () => {
     const { home, dir } = await fixture();
     const chosen: string[] = [];
     await runInstall(
@@ -126,16 +124,15 @@ describe('scion install --env-name', () => {
       { home },
     );
     const text = chosen.join('');
-    expect(text).toContain('as requested with --env-name');
-    expect(text).not.toContain('scion namespaces it');
-    expect(text).not.toContain('--keep-env-names');
+    expect(text).toContain('renamed from MCP_TOKEN as you asked');
 
-    const auto: string[] = [];
+    const kept: string[] = [];
     const { home: home2, dir: dir2 } = await fixture();
-    await runInstall(['--to', 'kimi', '--yes', dir2], { write: (s) => auto.push(s) }, { home: home2 });
-    const autoText = auto.join('');
-    expect(autoText).toContain('scion namespaces it');
-    expect(autoText).toContain('--keep-env-names');
+    await runInstall(['--to', 'kimi', '--yes', dir2], { write: (s) => kept.push(s) }, { home: home2 });
+    const keptText = kept.join('');
+    expect(keptText).toContain('name kept exactly as the plugin author wrote it');
+    // 名字长什么样都不评价：不猜它泛不泛，也不替用户想一个新名字
+    expect(keptText).not.toMatch(/generic|DEMO_MCP_TOKEN/);
   });
 
   it('is a usage error when the pair is malformed', async () => {

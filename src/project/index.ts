@@ -16,8 +16,8 @@ export function project(
   target: EcosystemProfile,
   opts: ProjectionOptions = {},
 ): ProjectionResult {
-  const { manifest, files, findings } = projectManifest(ir, target, opts);
-  return { manifest, manifestPath: target.manifestPaths[0], files, findings };
+  const { manifest, files, findings, envVars } = projectManifest(ir, target, opts);
+  return { manifest, manifestPath: target.manifestPaths[0], files, findings, envVars };
 }
 
 /** 完整投影：清单 + 所有需要改写的正文文件 */

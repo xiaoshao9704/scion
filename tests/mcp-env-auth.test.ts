@@ -5,7 +5,8 @@ import { project } from '../src/project/index.js';
 import { loadProfile } from '../src/profiles/loader.js';
 import type { Finding } from '../src/ir/types.js';
 import type { EcosystemProfile } from '../src/profiles/types.js';
-import type { ProjectionResult } from '../src/project/types.js';
+import type { ProjectionOptions, ProjectionResult } from '../src/project/types.js';
+import type { EnvVarUse } from '../src/mcp/env.js';
 
 const claude = loadProfile('claude');
 const kimi = loadProfile('kimi');
@@ -26,6 +27,11 @@ function serversOf(out: ProjectionResult): Record<string, Record<string, unknown
   return out.manifest.mcpServers as Record<string, Record<string, unknown>>;
 }
 
+/** 单变量场景下那个变量落在哪个字段 */
+function envVarWhere(out: ProjectionResult): string {
+  return out.envVars[0].where;
+}
+
 function findingOf(findings: Finding[], code: string): Finding {
   const hit = findings.find((f) => f.code === code);
   if (!hit) throw new Error(`no finding ${code}; got: ${findings.map((f) => f.code).join(', ')}`);
@@ -35,10 +41,15 @@ function findingOf(findings: Finding[], code: string): Finding {
 async function convert(
   servers: unknown,
   target: EcosystemProfile,
-): Promise<{ servers: Record<string, Record<string, unknown>>; findings: Finding[] }> {
+  opts: ProjectionOptions = {},
+): Promise<{
+  servers: Record<string, Record<string, unknown>>;
+  findings: Finding[];
+  envVars: EnvVarUse[];
+}> {
   const ir = await normalize(await claudePlugin(servers), claude);
-  const out = project(ir, target);
-  return { servers: serversOf(out), findings: out.findings };
+  const out = project(ir, target, opts);
+  return { servers: serversOf(out), findings: out.findings, envVars: out.envVars };
 }
 
 describe('profiles declare how each ecosystem spells "take this from an env var"', () => {
@@ -154,30 +165,33 @@ describe('normalize reads env references as structured facts', () => {
 
 describe('the bearer notation converts losslessly in both directions', () => {
   it('claude → kimi: inline header becomes bearerTokenEnvVar', async () => {
-    const { servers, findings } = await convert(
+    const { servers, envVars } = await convert(
       { tracker: { url: 'https://mcp.example.com/', headers: { Authorization: 'Bearer ${TRACKER_MCP_TOKEN}' } } },
       kimi,
     );
     expect(servers.tracker.bearerTokenEnvVar).toBe('TRACKER_MCP_TOKEN');
     expect(servers.tracker.headers).toBeUndefined();
 
-    const finding = findingOf(findings, 'mcp.auth.bearer-field');
-    expect(finding.level).toBe('INFO');
-    expect(finding.where).toBe('kimi.plugin.json#mcpServers.tracker.bearerTokenEnvVar');
-    expect(finding.message).toContain('TRACKER_MCP_TOKEN');
+    // 「这个值怎么来的」不再是一条 finding，而是环境变量那一列里的一行
+    expect(envVars).toEqual([
+      expect.objectContaining({
+        name: 'TRACKER_MCP_TOKEN',
+        handling: ['bearer-field'],
+        where: 'kimi.plugin.json#mcpServers.tracker.bearerTokenEnvVar',
+      }),
+    ]);
   });
 
   it('claude → codex: inline header becomes bearer_token_env_var, never a headers key', async () => {
-    const { servers, findings } = await convert(
+    const { servers, envVars } = await convert(
       { tracker: { url: 'https://mcp.example.com/', headers: { Authorization: 'Bearer ${TRACKER_MCP_TOKEN}' } } },
       codex,
     );
     expect(servers.tracker.bearer_token_env_var).toBe('TRACKER_MCP_TOKEN');
     // 实测：codex 插件 .mcp.json 里的 headers 键被整个丢弃 —— 缺陷回归守卫
     expect(servers.tracker.headers).toBeUndefined();
-    expect(findingOf(findings, 'mcp.auth.bearer-field').where).toBe(
-      '.mcp.json#mcpServers.tracker.bearer_token_env_var',
-    );
+    expect(envVars[0].where).toBe('.mcp.json#mcpServers.tracker.bearer_token_env_var');
+    expect(envVars[0].handling).toEqual(['bearer-field']);
   });
 
   it('kimi → claude: the dedicated field becomes an inline placeholder again', async () => {
@@ -189,7 +203,7 @@ describe('the bearer notation converts losslessly in both directions', () => {
     });
     const out = project(await normalize(root, kimi), claude);
     expect(serversOf(out).tracker.headers).toEqual({ Authorization: 'Bearer ${TRACKER_MCP_TOKEN}' });
-    expect(findingOf(out.findings, 'mcp.auth.bearer-inline').where).toBe(
+    expect(envVarWhere(out)).toBe(
       '.mcp.json#mcpServers.tracker.headers.Authorization',
     );
   });
@@ -310,7 +324,7 @@ describe('the notation lives in the profile, not the engine', () => {
         },
       },
     };
-    const { servers, findings } = await convert(
+    const { servers, envVars } = await convert(
       {
         tracker: {
           url: 'https://mcp.example.com/',
@@ -321,100 +335,74 @@ describe('the notation lives in the profile, not the engine', () => {
     );
     expect(servers.tracker.token_from_env).toBe('TRACKER_MCP_TOKEN');
     expect(servers.tracker.static_headers).toEqual({ 'X-Tenant': 'acme' });
-    expect(findingOf(findings, 'mcp.auth.bearer-field').where).toBe(
-      '.mcp.json#mcpServers.tracker.token_from_env',
-    );
+    expect(envVars[0].where).toBe('.mcp.json#mcpServers.tracker.token_from_env');
   });
 });
 
-describe('generic variable names get namespaced to the plugin', () => {
-  it('renames MCP_TOKEN but leaves an already-namespaced name alone', async () => {
-    const { servers, findings } = await convert(
+describe('scion never renames an environment variable on its own', () => {
+  it('keeps a generic name exactly as the author wrote it', async () => {
+    const { servers, envVars } = await convert(
       {
         tracker: { url: 'https://mcp.example.com/', headers: { Authorization: 'Bearer ${MCP_TOKEN}' } },
         builds: { url: 'https://builds.example.com/', headers: { Authorization: 'Bearer ${TRACKER_MCP_TOKEN}' } },
       },
       kimi,
     );
-    expect(servers.tracker.bearerTokenEnvVar).toBe('ACME_TOOLKIT_MCP_TOKEN');
+    // 作者写 MCP_TOKEN，产物里就是 MCP_TOKEN——用户 export 的名字与上游文档一致
+    expect(servers.tracker.bearerTokenEnvVar).toBe('MCP_TOKEN');
     expect(servers.builds.bearerTokenEnvVar).toBe('TRACKER_MCP_TOKEN');
-
-    const renamed = findings.filter((f) => f.code === 'mcp.env.renamed');
-    expect(renamed).toHaveLength(1);
-    expect(renamed[0].message).toContain('MCP_TOKEN');
-    expect(renamed[0].message).toContain('ACME_TOOLKIT_MCP_TOKEN');
-    // 可直接执行的一行，把旧变量的值搬到新名字下——scion 自己从不读这个值
-    expect(renamed[0].message).toContain('export ACME_TOOLKIT_MCP_TOKEN="$MCP_TOKEN"');
-    expect(renamed[0].message).toContain('--keep-env-names');
-    expect(renamed[0].where).toBe('kimi.plugin.json#mcpServers.tracker.bearerTokenEnvVar');
+    expect(envVars.map((u) => u.name).sort()).toEqual(['MCP_TOKEN', 'TRACKER_MCP_TOKEN']);
+    expect(envVars.every((u) => u.previous === undefined)).toBe(true);
   });
 
-  it('uses one explicit list of generic names, not a heuristic', async () => {
-    for (const name of ['MCP_TOKEN', 'TOKEN', 'API_KEY', 'API_TOKEN', 'AUTH_TOKEN', 'SECRET', 'KEY']) {
-      const { servers } = await convert(
-        { tracker: { url: 'https://mcp.example.com/', headers: { Authorization: `Bearer \${${name}}` } } },
-        kimi,
-      );
-      expect(servers.tracker.bearerTokenEnvVar).toBe(`ACME_TOOLKIT_${name}`);
-    }
-    for (const name of ['TRACKER_TOKEN', 'METRICS_API_KEY', 'GITHUB_PERSONAL_ACCESS_TOKEN']) {
-      const { servers } = await convert(
+  // scion 曾经拿一份写死的「泛化名清单」去判断哪个名字该加前缀。这类命名枚举不全，
+  // 而猜错的代价是产物里出现一个上游文档里根本不存在的变量名。任何名字一律照抄。
+  it('treats every name the same, generic-looking or not', async () => {
+    for (const name of ['MCP_TOKEN', 'TOKEN', 'API_KEY', 'SECRET', 'TRACKER_TOKEN', 'GH_PAT']) {
+      const { servers, envVars } = await convert(
         { tracker: { url: 'https://mcp.example.com/', headers: { Authorization: `Bearer \${${name}}` } } },
         kimi,
       );
       expect(servers.tracker.bearerTokenEnvVar).toBe(name);
+      expect(envVars[0].name).toBe(name);
+      expect(envVars[0].previous).toBeUndefined();
     }
   });
 
-  it('says it once per variable even when several servers reference it', async () => {
-    const { findings } = await convert(
+  it('reports a variable once even when several servers reference it', async () => {
+    const { envVars } = await convert(
       {
         tracker: { url: 'https://mcp.example.com/', headers: { Authorization: 'Bearer ${MCP_TOKEN}' } },
         observe: { command: 'node', env: { METRICS_TOKEN: '${MCP_TOKEN}' } },
       },
       codex,
     );
-    const renamed = findings.filter((f) => f.code === 'mcp.env.renamed');
-    expect(renamed).toHaveLength(1);
-    // 指向它第一次出现的字段，而不是最后一个
-    expect(renamed[0].where).toBe('.mcp.json#mcpServers.tracker.bearer_token_env_var');
+    expect(envVars).toHaveLength(1);
+    expect(envVars[0].servers).toEqual(['tracker', 'observe']);
+    // where 指向它第一次出现的字段，而不是最后一个
+    expect(envVars[0].where).toBe('.mcp.json#mcpServers.tracker.bearer_token_env_var');
+    // 同一个变量在两个 server 上落法不同，两种都要说
+    expect(envVars[0].handling).toEqual(['bearer-field', 'inline-literal']);
   });
 
-  it('is deterministic: the same plugin renames to the same name every time', async () => {
-    const first = await convert(
-      { tracker: { url: 'https://mcp.example.com/', headers: { Authorization: 'Bearer ${MCP_TOKEN}' } } },
-      codex,
-    );
-    const second = await convert(
-      { tracker: { url: 'https://mcp.example.com/', headers: { Authorization: 'Bearer ${MCP_TOKEN}' } } },
-      codex,
-    );
-    expect(first.servers.tracker.bearer_token_env_var).toBe(second.servers.tracker.bearer_token_env_var);
-    expect(first.servers.tracker.bearer_token_env_var).toBe('ACME_TOOLKIT_MCP_TOKEN');
-  });
-
-  it('rewrites the placeholder that stays inline too', async () => {
-    const { servers } = await convert(
+  it('leaves inline placeholders untouched as well', async () => {
+    const { servers, envVars } = await convert(
       { local: { command: 'node', env: { TRACKER_TOKEN: '${MCP_TOKEN}' }, args: ['--key=${API_KEY}'] } },
       claude,
     );
-    expect(servers.local.env).toEqual({ TRACKER_TOKEN: '${ACME_TOOLKIT_MCP_TOKEN}' });
-    expect(servers.local.args).toEqual(['--key=${ACME_TOOLKIT_API_KEY}']);
+    expect(servers.local.env).toEqual({ TRACKER_TOKEN: '${MCP_TOKEN}' });
+    expect(servers.local.args).toEqual(['--key=${API_KEY}']);
+    expect(envVars.map((u) => u.handling)).toEqual([['inline-expanded'], ['inline-expanded']]);
   });
 
-  it('--keep-env-names leaves every name as the author wrote it', async () => {
-    const ir = await normalize(
-      await claudePlugin({
-        tracker: {
-          url: 'https://mcp.example.com/',
-          headers: { Authorization: 'Bearer ${MCP_TOKEN}' },
-        },
-      }),
-      claude,
+  it('renames only what --env-name names, and records what it renamed from', async () => {
+    const { servers, envVars } = await convert(
+      { tracker: { url: 'https://mcp.example.com/', headers: { Authorization: 'Bearer ${MCP_TOKEN}' } } },
+      kimi,
+      { envNames: new Map([['MCP_TOKEN', 'ACME_HUB_TOKEN']]) },
     );
-    const out = project(ir, kimi, { keepEnvNames: true });
-    expect(serversOf(out).tracker.bearerTokenEnvVar).toBe('MCP_TOKEN');
-    expect(out.findings.filter((f) => f.code === 'mcp.env.renamed')).toEqual([]);
+    expect(servers.tracker.bearerTokenEnvVar).toBe('ACME_HUB_TOKEN');
+    expect(envVars[0]).toMatchObject({ name: 'ACME_HUB_TOKEN', previous: 'MCP_TOKEN' });
   });
 });
 

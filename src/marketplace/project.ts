@@ -135,6 +135,8 @@ export async function emitMarketplace(
   mp: MarketplaceIR,
   target: EcosystemProfile,
   outDir: string,
+  /** 按插件分开的环境变量改名。一个市场里几十个插件，映射必然是按插件给的 */
+  envNamesByPlugin: Map<string, Map<string, string>> = new Map(),
 ): Promise<MarketplaceEmitResult> {
   const dialect = target.marketplaceDialect;
   const projection = projectMarketplace(mp, target);
@@ -197,7 +199,10 @@ export async function emitMarketplace(
       // 正是 `scion convert` 和 `scion market convert` 在同一份插件上产生不同
       // exit code 的根因。findings 直接取 doctor 的结果，projectAll 只在
       // 通过后为了拿到要落盘的 manifest/files 再调一次，不重复计入 findings。
-      const entryFindings = await doctor(ir, target);
+      // 映射按**插件名**取，不是按 catalog 条目名：产物里读这个变量的是插件自己，
+      // 而条目名只是市场对它的称呼，两者完全可以不同。
+      const entryOpts = { envNames: envNamesByPlugin.get(ir.identity.name) };
+      const { findings: entryFindings } = await doctor(ir, target, entryOpts);
       const prefixed = entryFindings.map((f) => ({ ...f, where: `${entry.name}:${f.where ?? ''}` }));
 
       if (worstLevel(entryFindings) === 'BLOCK') {
@@ -206,7 +211,7 @@ export async function emitMarketplace(
         continue;
       }
 
-      const projected = await projectAll(ir, target);
+      const projected = await projectAll(ir, target, entryOpts);
       await emit(ir, projected, join(outDir, 'plugins', entry.name), join(outDir, 'plugins'));
       converted.push(entry.name);
       findings.push(...prefixed);

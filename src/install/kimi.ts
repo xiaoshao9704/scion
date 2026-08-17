@@ -78,7 +78,7 @@ export const kimiInstaller: Installer = {
     const strategy = profile.install.strategy;
     if (strategy.kind !== 'kimi-managed') throw new Error('kimi profile must use the kimi-managed strategy');
 
-    const projected = await projectAll(ir, profile, { keepEnvNames: opts.keepEnvNames, envNames: opts.envNames });
+    const projected = await projectAll(ir, profile, { envNames: opts.envNames });
 
     if (!opts.writeRegistry) {
       // 默认路径：落到 scion 维护的本地 marketplace，与 codex-cli 同一形状——只是 catalog

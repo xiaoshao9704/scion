@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Finding, FindingLevel, PluginIR } from '../ir/types.js';
 import type { EcosystemProfile } from '../profiles/types.js';
 import { projectAll, type ProjectionOptions } from '../project/index.js';
+import type { EnvVarUse } from '../mcp/env.js';
 
 const LEVEL_ORDER: Record<FindingLevel, number> = { BLOCK: 3, LOSS: 2, INFO: 1 };
 
@@ -14,11 +15,21 @@ export function worstLevel(findings: Finding[]): FindingLevel | null {
   return worst;
 }
 
+/**
+ * 检查结论。环境变量那一列不是 finding——它多数时候什么问题也没有，只是「这个插件要读
+ * 这几个变量，scion 是这么处理的」。混进 findings 会让它要么被当成问题，要么在没有问题
+ * 时整段消失，而用户恰恰需要在一切正常时也看到它。
+ */
+export interface DoctorReport {
+  findings: Finding[];
+  envVars: EnvVarUse[];
+}
+
 export async function doctor(
   ir: PluginIR,
   target?: EcosystemProfile,
   opts: ProjectionOptions = {},
-): Promise<Finding[]> {
+): Promise<DoctorReport> {
   const findings: Finding[] = [...ir.issues];
 
   for (const p of ir.provenance) {
@@ -34,7 +45,7 @@ export async function doctor(
 
   findings.push(...(await checkInlineBash(ir)));
 
-  if (!target) return findings;
+  if (!target) return { findings, envVars: [] };
 
   const projected = await projectAll(ir, target, opts);
   findings.push(...projected.findings);
@@ -78,7 +89,7 @@ export async function doctor(
     }
   }
 
-  return findings;
+  return { findings, envVars: projected.envVars };
 }
 
 /** Claude command 支持 !`cmd` 内联 bash；目标端是否支持未经实测，先按有损处理 */

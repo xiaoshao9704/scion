@@ -59,7 +59,6 @@ export interface InstallPlan {
 export interface InstallOpts {
   home: string;
   /** 透传给投影：保留作者写的环境变量名，不做消歧改名 */
-  keepEnvNames?: boolean;
   /** 用户点名的环境变量改名，透传给投影 */
   envNames?: Map<string, string>;
   /**

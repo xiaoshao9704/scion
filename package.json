@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": { "scion": "dist/cli.js" },
+  "files": ["dist"],
   "engines": { "node": ">=20" },
   "scripts": {
     "build": "tsc",

@@ -8,7 +8,7 @@ import { loadProfile } from '../profiles/loader.js';
 import { projectAll } from '../project/index.js';
 import { emit } from '../emit/write.js';
 import { doctor, worstLevel } from '../doctor/index.js';
-import { formatFindings } from '../doctor/report.js';
+import { formatEnvVars, formatFindings } from '../doctor/report.js';
 import { parseEcosystem } from './doctor.js';
 import { parseEnvNames } from '../mcp/env-flag.js';
 
@@ -37,7 +37,6 @@ export async function runConvert(argv: string[], io: CliIo): Promise<number> {
       to: { type: 'string' },
       from: { type: 'string', default: 'claude' },
       out: { type: 'string', short: 'o' },
-      'keep-env-names': { type: 'boolean', default: false },
       'env-name': { type: 'string', multiple: true },
     },
     allowPositionals: true,
@@ -46,7 +45,7 @@ export async function runConvert(argv: string[], io: CliIo): Promise<number> {
   const dir = positionals[0];
   if (!dir || !values.to) {
     io.write(
-      'usage: scion convert <dir> --to kimi|codex [-o <dir>] [--from claude] [--keep-env-names] [--env-name OLD=NEW]\n',
+      'usage: scion convert <dir> --to kimi|codex [-o <dir>] [--from claude] [--env-name OLD=NEW]\n',
     );
     return 1;
   }
@@ -56,11 +55,11 @@ export async function runConvert(argv: string[], io: CliIo): Promise<number> {
   const ir = await normalize(dir, source);
 
   const projection = {
-    keepEnvNames: values['keep-env-names'] as boolean,
     envNames: parseEnvNames(values['env-name'] as string[] | undefined),
   };
-  const findings = await doctor(ir, target, projection);
+  const { findings, envVars } = await doctor(ir, target, projection);
   io.write(formatFindings(findings));
+  io.write(formatEnvVars(envVars, target.id));
   if (worstLevel(findings) === 'BLOCK') {
     io.write('BLOCK findings present; conversion aborted.\n');
     return 2;

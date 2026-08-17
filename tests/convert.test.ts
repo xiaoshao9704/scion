@@ -69,7 +69,7 @@ describe('source hygiene', () => {
   });
 });
 
-describe('runConvert --keep-env-names', () => {
+describe('runConvert and environment variable names', () => {
   async function authFixture() {
     return makePluginDir({
       '.claude-plugin/plugin.json': JSON.stringify({ name: 'acme-toolkit', version: '1.0.0' }),
@@ -81,23 +81,35 @@ describe('runConvert --keep-env-names', () => {
     });
   }
 
-  it('namespaces the variable by default', async () => {
+  it('keeps the author name by default', async () => {
     const dir = await authFixture();
     const out = join(await makePluginDir({}), 'out');
     const code = await runConvert([dir, '--to', 'kimi', '-o', out], { write: () => {} });
     expect(code).toBe(0);
     const manifest = JSON.parse(await readFile(join(out, 'kimi.plugin.json'), 'utf8'));
-    expect(manifest.mcpServers.tracker.bearerTokenEnvVar).toBe('ACME_TOOLKIT_MCP_TOKEN');
+    expect(manifest.mcpServers.tracker.bearerTokenEnvVar).toBe('MCP_TOKEN');
   });
 
-  it('keeps the author name when asked', async () => {
+  it('renames only when --env-name says so', async () => {
     const dir = await authFixture();
     const out = join(await makePluginDir({}), 'out');
-    const code = await runConvert([dir, '--to', 'kimi', '-o', out, '--keep-env-names'], {
-      write: () => {},
-    });
+    const code = await runConvert(
+      [dir, '--to', 'kimi', '-o', out, '--env-name', 'MCP_TOKEN=ACME_HUB_TOKEN'],
+      { write: () => {} },
+    );
     expect(code).toBe(0);
     const manifest = JSON.parse(await readFile(join(out, 'kimi.plugin.json'), 'utf8'));
-    expect(manifest.mcpServers.tracker.bearerTokenEnvVar).toBe('MCP_TOKEN');
+    expect(manifest.mcpServers.tracker.bearerTokenEnvVar).toBe('ACME_HUB_TOKEN');
+  });
+
+  it('prints the environment-variable column even when nothing is wrong', async () => {
+    const dir = await authFixture();
+    const out = join(await makePluginDir({}), 'out');
+    const printed: string[] = [];
+    await runConvert([dir, '--to', 'kimi', '-o', out], { write: (s) => printed.push(s) });
+    const text = printed.join('');
+    expect(text).toContain('environment variables this plugin reads');
+    expect(text).toContain('MCP_TOKEN');
+    expect(text).toContain('name kept exactly as the plugin author wrote it');
   });
 });

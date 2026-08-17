@@ -145,47 +145,12 @@ function walkStrings(
   }
 }
 
-/**
- * 泛化到会在一台机器上跨插件撞车的变量名。**显式清单，不是启发式**——名字够不够泛化
- * 没有可靠的判据，猜错的代价是给一个本来就带命名空间的变量再套一层前缀（纯噪音）。
- * 清单是数据：要加名字就往这里加，引擎不变。
- *
- * 注意这份清单不属于任何生态的事实（三家宿主都不关心变量叫什么），所以它不进 profile。
- */
-export const GENERIC_ENV_NAMES = [
-  'MCP_TOKEN',
-  'TOKEN',
-  'API_KEY',
-  'API_TOKEN',
-  'AUTH_TOKEN',
-  'SECRET',
-  'KEY',
-] as const;
-
-/** 插件名 → 环境变量前缀：acme-toolkit → ACME_TOOLKIT */
-export function envPrefix(pluginName: string): string {
-  const upper = pluginName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  // 环境变量名不能以数字开头
-  return /^[0-9]/.test(upper) ? `_${upper}` : upper;
-}
-
-/** 该改名则给出新名字，否则 null。同一插件重装两次必然得到同一个名字 */
-export function disambiguate(envVar: string, pluginName: string): string | null {
-  if (!(GENERIC_ENV_NAMES as readonly string[]).includes(envVar)) return null;
-  const prefix = envPrefix(pluginName);
-  return prefix ? `${prefix}_${envVar}` : null;
-}
-
 export interface RenderContext {
   targetId: EcosystemId;
   /** 这份 server 表在产物里落到哪个文件；finding 的 where 要精确到「文件#字段」 */
   file: string;
   serverName: string;
-  /** 消歧改名用的命名空间 */
-  pluginName: string;
-  /** 插件自己的运行时代码可能就读着这个变量名，改名会断链——这是那条退路 */
-  keepEnvNames: boolean;
-  /** 用户点名的 旧名→新名。优先于自动消歧，也优先于 keepEnvNames */
+  /** 用户点名的 旧名→新名。这是改名的**唯一**来源 */
   envNames?: Map<string, string>;
 }
 
@@ -218,30 +183,34 @@ export function renderServer(
   ctx: RenderContext,
 ): RenderResult {
   const findings: Finding[] = [];
-  if (!auth) return { server: { ...config }, findings, renames: [] };
+  if (!auth) return { server: { ...config }, findings, uses: [] };
 
-  // 改名先算齐，之后无论落到哪种记法、还是留在原地当占位符，用的都是同一个新名字
+  // 改名先算齐，之后无论落到哪种记法、还是留在原地当占位符，用的都是同一个新名字。
+  // 唯一来源是用户的 --env-name：一个变量真正归谁，只有用户知道（典型情形是多个插件
+  // 共用一台本地 MCP hub，令牌属于 hub 而不属于其中任何一个插件）。scion 不猜。
   const renames = new Map<string, string>();
   for (const ref of auth.refs) {
-    // 用户点名指定的优先于一切：自动消歧只知道「插件叫什么」，而一个变量真正的归属
-    // 未必是插件。典型情形是多个插件共用一台本地 MCP hub，令牌属于 hub 而不属于其中
-    // 任何一个插件——按插件名加前缀会让每个插件各要一份同样的令牌。这种事只有用户
-    // 知道，所以给了名字就照用，连 --keep-env-names 也不该反悔（两者矛盾时，
-    // 明确点名的那个更具体）。
     const chosen = ctx.envNames?.get(ref.envVar);
-    if (chosen) {
-      if (chosen !== ref.envVar) renames.set(ref.envVar, chosen);
-      continue;
-    }
-    if (ctx.keepEnvNames) continue;
-    const next = disambiguate(ref.envVar, ctx.pluginName);
-    if (next) renames.set(ref.envVar, next);
+    if (chosen && chosen !== ref.envVar) renames.set(ref.envVar, chosen);
   }
   const named = (envVar: string): string => renames.get(envVar) ?? envVar;
-  /** 每个被改名的变量第一次出现在哪个字段——改名 finding 就指那儿 */
-  const firstUse = new Map<string, string>();
-  const noteUse = (envVar: string, where: string): string => {
-    if (!firstUse.has(envVar)) firstUse.set(envVar, where);
+
+  /** 每个变量的落法与首次出现位置。报告按变量成行，所以这里就按变量攒 */
+  const uses = new Map<string, EnvVarUse>();
+  const noteUse = (envVar: string, where: string, handling: EnvHandling): string => {
+    const existing = uses.get(envVar);
+    if (existing) {
+      if (!existing.handling.includes(handling)) existing.handling.push(handling);
+      return where;
+    }
+    const previous = renames.has(envVar) ? envVar : undefined;
+    uses.set(envVar, {
+      name: named(envVar),
+      ...(previous ? { previous } : {}),
+      handling: [handling],
+      servers: [ctx.serverName],
+      where,
+    });
     return where;
   };
 
@@ -255,62 +224,48 @@ export function renderServer(
     switch (ref.kind) {
       case 'bearer': {
         if (dialect.bearerTokenEnvField) {
-          const where = noteUse(ref.envVar, at(ctx, dialect.bearerTokenEnvField));
+          const where = noteUse(ref.envVar, at(ctx, dialect.bearerTokenEnvField), 'bearer-field');
           server[dialect.bearerTokenEnvField] = named(ref.envVar);
-          findings.push({
-            level: 'INFO',
-            code: 'mcp.auth.bearer-field',
-            message: `${ctx.targetId} takes the bearer token from ${dialect.bearerTokenEnvField} rather than an inline Authorization header; export ${named(ref.envVar)} in the environment that starts ${ctx.targetId}`,
-            where,
-          });
           break;
         }
-        const where = noteUse(ref.envVar, at(ctx, dialect.headersKey, 'Authorization'));
-        headers.Authorization = `Bearer \${${named(ref.envVar)}}`;
-        findings.push(
-          dialect.expandsInlineVars
-            ? {
-                level: 'INFO',
-                code: 'mcp.auth.bearer-inline',
-                message: `${ctx.targetId} expands \${...} in the MCP config when it connects, so the bearer token goes back into an inline Authorization header; export ${named(ref.envVar)} in the environment that starts ${ctx.targetId}`,
-                where,
-              }
-            : notExpanded(ctx, named(ref.envVar), where),
+        const where = noteUse(
+          ref.envVar,
+          at(ctx, dialect.headersKey, 'Authorization'),
+          dialect.expandsInlineVars ? 'bearer-inline' : 'inline-literal',
         );
+        headers.Authorization = `Bearer \${${named(ref.envVar)}}`;
+        if (!dialect.expandsInlineVars) findings.push(notExpanded(ctx, named(ref.envVar), where));
         break;
       }
 
       case 'header-value': {
         if (dialect.envHeadersField) {
-          const where = noteUse(ref.envVar, at(ctx, dialect.envHeadersField, ref.header));
+          const where = noteUse(
+            ref.envVar,
+            at(ctx, dialect.envHeadersField, ref.header),
+            'header-field',
+          );
           envHeaders[ref.header] = named(ref.envVar);
-          findings.push({
-            level: 'INFO',
-            code: 'mcp.env.header-field',
-            message: `the ${ref.header} header value is taken from ${dialect.envHeadersField} rather than an inline placeholder; export ${named(ref.envVar)} in the environment that starts ${ctx.targetId}`,
-            where,
-          });
           break;
         }
-        const where = noteUse(ref.envVar, at(ctx, dialect.headersKey, ref.header));
-        headers[ref.header] = `\${${named(ref.envVar)}}`;
-        findings.push(
-          dialect.expandsInlineVars
-            ? {
-                level: 'INFO',
-                code: 'mcp.env.header-inline',
-                message: `${ctx.targetId} expands \${...} in the MCP config when it connects, so the ${ref.header} header value goes back into an inline placeholder; export ${named(ref.envVar)} in the environment that starts ${ctx.targetId}`,
-                where,
-              }
-            : notExpanded(ctx, named(ref.envVar), where),
+        const where = noteUse(
+          ref.envVar,
+          at(ctx, dialect.headersKey, ref.header),
+          dialect.expandsInlineVars ? 'header-inline' : 'inline-literal',
         );
+        headers[ref.header] = `\${${named(ref.envVar)}}`;
+        if (!dialect.expandsInlineVars) findings.push(notExpanded(ctx, named(ref.envVar), where));
         break;
       }
 
       case 'inline': {
         // at 是规范路径，头里的占位符记作 ['headers', …]；写出时换成目标生态的头键名
         const path = ref.at[0] === 'headers' ? [dialect.headersKey, ...ref.at.slice(1)] : ref.at;
-        const where = noteUse(ref.envVar, at(ctx, ...path));
+        const where = noteUse(
+          ref.envVar,
+          at(ctx, ...path),
+          dialect.expandsInlineVars ? 'inline-expanded' : 'inline-literal',
+        );
         if (dialect.expandsInlineVars) break;
         findings.push(notExpanded(ctx, named(ref.envVar), where));
         break;
@@ -326,53 +281,45 @@ export function renderServer(
     server[dialect.envHeadersField] = envHeaders;
   }
 
-  return {
-    server,
-    findings,
-    // 改名是插件级的一件事（同一个变量可能被多个 server 引用），所以只交出数据，
-    // 由调用方跨 server 汇总成一条 finding——否则同一句话会重复出现好几遍。
-    renames: [...renames].map(([previous, next]) => ({
-      previous,
-      next,
-      where: firstUse.get(previous) ?? '',
-      chosenByUser: ctx.envNames?.get(previous) === next,
-    })),
-  };
+  return { server, findings, uses: [...uses.values()] };
 }
 
-/** 一次改名：旧名、新名、以及它第一次出现在哪个字段 */
-export interface EnvRename {
-  previous: string;
-  next: string;
+/**
+ * 一个环境变量在产物里的落法。报告要回答的就是这一列：这个值 scion 是当 token 交给了
+ * 目标生态的专用字段，还是留成占位符等目标连接时展开，还是根本没人展开、得用户手填。
+ */
+export type EnvHandling =
+  /** 目标生态有专门接 bearer token 的字段，值由宿主在连接时从环境里取 */
+  | 'bearer-field'
+  /** 没有专用字段，写回 Authorization 头里的占位符，宿主连接时按值展开 */
+  | 'bearer-inline'
+  /** 目标生态有专门接「整个头值取自某变量」的字段 */
+  | 'header-field'
+  /** 没有专用字段，写回头里的占位符，宿主连接时按值展开 */
+  | 'header-inline'
+  /** 占位符留在配置的其他字段里，宿主连接时按值展开 */
+  | 'inline-expanded'
+  /** 占位符原样写出，而宿主不展开它——没人替用户填这个值 */
+  | 'inline-literal';
+
+/** 一个环境变量这次被怎么处理了。报告按变量成行，所以跨 server 先合并到这一条 */
+export interface EnvVarUse {
+  /** 产物里最终写下的名字 */
+  name: string;
+  /** 改名前的名字。只有 --env-name 点过名才有 */
+  previous?: string;
+  /** 它在产物里的每一种落法，按首次出现顺序 */
+  handling: EnvHandling[];
+  /** 引用它的 server */
+  servers: string[];
+  /** 第一次出现在哪个字段 */
   where: string;
-  /** 用户用 --env-name 点名的，而不是 scion 自动消歧出来的 */
-  chosenByUser: boolean;
 }
 
 export interface RenderResult {
   server: McpServerConfig;
   findings: Finding[];
-  renames: EnvRename[];
-}
-
-/** 跨 server 汇总后的改名 finding：一个变量一条 */
-export function renameFinding(rename: EnvRename, targetId: EcosystemId): Finding {
-  const { previous, next, chosenByUser } = rename;
-  // 为什么改的名，两种情况差别很大：用户点名的不该再被劝「用 --keep-env-names 改回去」，
-  // 那等于把他刚下的决定说成一个待纠正的默认行为。共通的部分只有那条 export 语句。
-  const why = chosenByUser
-    ? `renamed the environment variable ${previous} → ${next}, as requested with --env-name.`
-    : `renamed the environment variable ${previous} → ${next}: "${previous}" is generic enough that two plugins on one machine would fight over it, so scion namespaces it to this plugin.`;
-  const escape = chosenByUser
-    ? ''
-    : ` Re-run with --keep-env-names to keep ${previous}, or --env-name ${previous}=<NAME> to choose the name yourself (do that if the plugin's own code reads a particular name).`;
-  return {
-    level: 'INFO',
-    code: 'mcp.env.renamed',
-    // 旧名、新名、以及一条可以直接粘进 shell 的语句：搬运的是名字，值全程留在用户的环境里
-    message: `${why} Before starting ${targetId}, run: export ${next}="$${previous}" — the plugin's own docs will still call it ${previous}.${escape}`,
-    where: rename.where,
-  };
+  uses: EnvVarUse[];
 }
 
 /** finding 的 where：文件 + 字段，精确到 agent 该去改的那一处 */

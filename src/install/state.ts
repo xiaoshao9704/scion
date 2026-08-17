@@ -11,6 +11,15 @@ export interface InstallRecord {
   sourceKind: 'path' | 'zip' | 'git';
   pluginRoot: string;
   registered: boolean;
+  /**
+   * 这个插件的环境变量改名（旧名 → 新名），用户用 --env-name 点的名。
+   *
+   * 记在账本里而不是只活在那一次命令行里，是因为改名是**插件维度**的一件长期事实：
+   * 用户按新名字在 rc 文件里写了 export，之后 `scion sync` 重新转换安装时若不带上
+   * 同一份映射，产物会悄悄退回作者的原名，那行 export 就再也没人读——插件不报错，
+   * 只是 MCP 连不上。没改过名的插件不写这个字段。
+   */
+  envNames?: Record<string, string>;
   installedAt: string;
   updatedAt: string;
 }

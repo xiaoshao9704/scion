@@ -13,12 +13,14 @@ import { emitMarketplace, projectMarketplace } from '../marketplace/project.js';
 import { isSafePathSegment } from '../normalize/index.js';
 import { formatFindings } from '../doctor/report.js';
 import { parseEcosystem } from './doctor.js';
+import { EnvNameError, parseEnvNamesByPlugin } from '../mcp/env-flag.js';
 import { assertSafeOutDir } from './convert.js';
 import { usageError, writeResult, type CommandResult } from '../output/result.js';
 
 const USAGE = [
   'usage:',
-  '  scion market convert <dir|json> --to codex|kimi [--from claude] [--as <name>] [-o <dir>] [--json]',
+  '  scion market convert <dir|json> --to codex|kimi [--from claude] [--as <name>] [-o <dir>]',
+  '                                  [--env-name <plugin>:OLD=NEW] [--json]',
   '  scion market show <dir|json> [--from claude] [--json]',
   '',
 ].join('\n');
@@ -118,6 +120,7 @@ export async function runMarket(
       from: { type: 'string', default: 'claude' },
       as: { type: 'string' },
       out: { type: 'string', short: 'o' },
+      'env-name': { type: 'string', multiple: true },
       json: { type: 'boolean', default: false },
     },
     allowPositionals: true,
@@ -220,7 +223,15 @@ export async function runMarket(
 
   const outDir = values.out ?? join(home, '.scion', 'markets', effectiveName, targetProfile.id);
   await assertSafeOutDir(outDir);
-  const result = await emitMarketplace(mpForTarget, targetProfile, outDir);
+  let envNamesByPlugin: Map<string, Map<string, string>>;
+  try {
+    envNamesByPlugin = parseEnvNamesByPlugin(values['env-name'] as string[] | undefined);
+  } catch (err) {
+    if (!(err instanceof EnvNameError)) throw err;
+    return writeResult(io, json, usageError('market', `${err.message}\n${USAGE}`));
+  }
+
+  const result = await emitMarketplace(mpForTarget, targetProfile, outDir, envNamesByPlugin);
 
   const findings = conflictFinding ? [conflictFinding, ...result.findings] : result.findings;
   const catalogAbs = join(outDir, result.catalogPath);

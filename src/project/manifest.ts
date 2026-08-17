@@ -2,6 +2,7 @@ import type { Finding, PluginIR } from '../ir/types.js';
 import type { EcosystemProfile } from '../profiles/types.js';
 import type { EmittedFile, ProjectionOptions } from './types.js';
 import { projectMcpServers } from './mcp.js';
+import type { EnvVarUse } from '../mcp/env.js';
 import { getSkillInstructions } from '../toolmap/index.js';
 
 const IDENTITY_ORDER = [
@@ -19,7 +20,12 @@ export function projectManifest(
   ir: PluginIR,
   target: EcosystemProfile,
   opts: ProjectionOptions,
-): { manifest: Record<string, unknown>; files: EmittedFile[]; findings: Finding[] } {
+): {
+  manifest: Record<string, unknown>;
+  files: EmittedFile[];
+  findings: Finding[];
+  envVars: EnvVarUse[];
+} {
   const manifest: Record<string, unknown> = {};
   const findings: Finding[] = [];
 
@@ -113,5 +119,5 @@ export function projectManifest(
     });
   }
 
-  return { manifest, files: mcp.files, findings };
+  return { manifest, files: mcp.files, findings, envVars: mcp.envVars };
 }

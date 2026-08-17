@@ -26,7 +26,7 @@ export const codexInstaller: Installer = {
 
     // 投影在这里做一次，结果连同文件清单一起进 plan；execute 拿的就是这一份，
     // 不会为了写盘再投影一次——两次投影之间的任何差异都会让预览变成谎言。
-    const projected = await projectAll(ir, profile, { keepEnvNames: opts.keepEnvNames, envNames: opts.envNames });
+    const projected = await projectAll(ir, profile, { envNames: opts.envNames });
     const files = await planEmitFiles(ir, projected);
 
     const actions: InstallAction[] = [

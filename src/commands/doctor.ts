@@ -1,15 +1,15 @@
 import { parseArgs } from 'node:util';
 import type { CliIo } from '../cli.js';
-import type { EcosystemId, Finding, PluginIdentity } from '../ir/types.js';
+import type { EcosystemId, PluginIdentity } from '../ir/types.js';
 import { normalize } from '../normalize/index.js';
 import { loadProfile, ALL_PROFILE_IDS } from '../profiles/loader.js';
-import { doctor, worstLevel } from '../doctor/index.js';
-import { formatFindings } from '../doctor/report.js';
+import { doctor, worstLevel, type DoctorReport } from '../doctor/index.js';
+import { formatEnvVars, formatFindings } from '../doctor/report.js';
 import { EnvNameError, parseEnvNames } from '../mcp/env-flag.js';
 import { usageError, writeResult, type CommandResult } from '../output/result.js';
 
 const USAGE =
-  'usage: scion doctor <dir> [--to kimi|codex] [--from claude] [--keep-env-names] [--env-name OLD=NEW] [--json]\n';
+  'usage: scion doctor <dir> [--to kimi|codex] [--from claude] [--env-name OLD=NEW] [--json]\n';
 
 export function parseEcosystem(value: string): EcosystemId {
   if (!(ALL_PROFILE_IDS as readonly string[]).includes(value)) {
@@ -30,7 +30,6 @@ export async function runDoctor(argv: string[], io: CliIo): Promise<number> {
       to: { type: 'string' },
       from: { type: 'string', default: 'claude' },
       json: { type: 'boolean', default: false },
-      'keep-env-names': { type: 'boolean', default: false },
       'env-name': { type: 'string', multiple: true },
     },
     allowPositionals: true,
@@ -45,14 +44,13 @@ export async function runDoctor(argv: string[], io: CliIo): Promise<number> {
   const target = values.to ? loadProfile(parseEcosystem(values.to)) : undefined;
 
   // doctor 报的必须是 convert/install 同样参数下会发生的事，所以同一个旋钮这里也要认
-  const findings = await doctor(ir, target, {
-    keepEnvNames: values['keep-env-names'] as boolean,
+  const report = await doctor(ir, target, {
     envNames: parseEnvNames(values['env-name'] as string[] | undefined),
   });
   return writeResult(
     io,
     json,
-    doctorResult(identityJson(ir.identity), source.id, target?.id, findings),
+    doctorResult(identityJson(ir.identity), source.id, target?.id, report),
   );
 }
 
@@ -65,14 +63,15 @@ function doctorResult(
   plugin: Record<string, unknown>,
   from: EcosystemId,
   to: EcosystemId | undefined,
-  findings: Finding[],
+  report: DoctorReport,
 ): CommandResult {
+  const { findings, envVars } = report;
   const worst = worstLevel(findings);
   const head = `${plugin.name}${plugin.version ? `@${plugin.version}` : ''} · ${from}${to ? ` → ${to}` : ''}\n\n`;
   return {
     command: 'doctor',
     exitCode: worst === 'BLOCK' ? 2 : 0,
-    human: head + formatFindings(findings),
-    json: { plugin, from, ...(to ? { to } : {}), worst, findings },
+    human: head + formatFindings(findings) + (to ? formatEnvVars(envVars, to) : ''),
+    json: { plugin, from, ...(to ? { to } : {}), worst, findings, envVars },
   };
 }
