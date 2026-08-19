@@ -7,6 +7,7 @@ import { loadProfile } from '../src/profiles/loader.js';
 
 const claude = loadProfile('claude');
 const kimi = loadProfile('kimi');
+const codex = loadProfile('codex');
 
 // 真实样本：argument-hint 的值以 "[" 开头，YAML 当它是流式序列，而 "]" 之后还有内容。
 // Claude 侧的插件就这么发着，gray-matter 会抛。
@@ -38,6 +39,8 @@ describe('frontmatter that is not valid YAML', () => {
     expect(hit!.level).toBe('LOSS');
     expect(hit!.where).toBe('commands/profile.md');
     expect(hit!.message).toMatch(/not valid YAML/);
+    // 后果按目标端声明的实测事实说：Kimi 自己也解析不动，然后整个文件丢弃
+    expect(hit!.message).toMatch(/will not exist there at all/);
   });
 
   // 跳过这个文件等于静默丢一条命令，比报错更坏：正文一个字节都不能动
@@ -59,6 +62,22 @@ describe('frontmatter that is not valid YAML', () => {
 // 第二次解析不再抛，而是返回空 frontmatter。一次 install 里同一个文件要过好几遍
 // （doctor 一遍、preview 再一遍，多目标再乘一遍），所以这条不守住，第二遍开始整个
 // 文件就被静默放行了。
+// 「原样复制」之后会发生什么，是目标端的事实，不是引擎行为——没实测过的生态不许乱说
+describe('the consequence is read from the target profile, never assumed', () => {
+  it('says it is untested for an ecosystem nobody measured', () => {
+    const out = remapFrontmatter(BAD, 'commands', claude, codex, 'commands/profile.md');
+    const hit = out.findings.find((f) => f.code === 'frontmatter.unparsed')!;
+    expect(codex.unparsedFrontmatter).toBe('unverified');
+    expect(hit.message).toMatch(/untested/);
+    expect(hit.message).not.toMatch(/will not exist there at all/);
+  });
+
+  it('names the right kind of file', () => {
+    const asAgent = remapFrontmatter(BAD, 'agents', claude, kimi, 'agents/x.md');
+    expect(asAgent.findings[0].message).toMatch(/this agent will not exist/);
+  });
+});
+
 describe('the report does not depend on how many times the file was parsed', () => {
   it('reports the same thing on every pass over identical content', async () => {
     const root = await makePluginDir({

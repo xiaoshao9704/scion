@@ -48,6 +48,11 @@ export const kimiProfile: EcosystemProfile = {
   },
   pathVar: null,
   pathVarStrategy: { kind: 'relativize' },
+  // 实测（Kimi 0.36.1，二进制内 packages/agent-core-v2/src/app/plugin/commands.ts）：
+  // parseFrontmatter 用 js-yaml，解析失败抛 FrontmatterError；而调用它的 loadPluginCommand
+  // 外面是 `try { ... } catch { return; }`，异常被吞掉、返回 undefined。结果是这个命令在
+  // Kimi 里根本不存在，既不报错也不降级——所以"原样复制"在 Kimi 这边等于整条命令消失。
+  unparsedFrontmatter: 'drops-the-file' as const,
   namePattern: '^[a-z0-9][a-z0-9_-]{0,63}$',
   limits: { fieldBytes: 32768, totalInstructionBytes: 65536 },
   install: {

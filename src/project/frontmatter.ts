@@ -37,13 +37,26 @@ export function remapFrontmatter(
     parsed = matter(source, {});
   } catch (err) {
     const reason = (err as Error).message.split('\n')[0];
+    const singular = kind === 'commands' ? 'command' : 'agent';
+    // 「原样复制」的后果由目标端决定，所以这句话必须从 profile 声明的实测事实里来，
+    // 不能写死。在 Kimi 上量到的是最坏的那种：宿主自己也解析不动，然后静默丢弃整个文件。
+    const consequence = {
+      'drops-the-file':
+        `${to.id} parses this frontmatter too, and drops the whole file when it cannot: this ` +
+        `${singular} will not exist there at all — no error, no degraded version`,
+      'keeps-the-file':
+        `${to.id} still loads the file, so the ${singular} works, but no field was remapped for it ` +
+        `and any ${from.id}-only field stays in it`,
+      unverified:
+        `whether ${to.id} still loads a file it cannot parse is untested — it may work with no field ` +
+        `remapped, or be dropped entirely`,
+    }[to.unparsedFrontmatter];
     findings.push({
       level: 'LOSS',
       code: 'frontmatter.unparsed',
       message:
-        `the frontmatter is not valid YAML (${reason}); the file is copied verbatim, so no field was ` +
-        `remapped for ${to.id} and any ${from.id}-only field stays in it. Quote the offending value ` +
-        'upstream to get a real conversion',
+        `the frontmatter is not valid YAML (${reason}), so scion copied the file verbatim instead of ` +
+        `converting it. ${consequence}. Quote the offending value upstream to fix it`,
       where,
     });
     return { content: source, findings };

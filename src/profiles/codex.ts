@@ -54,6 +54,8 @@ export const codexProfile: EcosystemProfile = {
   },
   pathVar: null,
   pathVarStrategy: { kind: 'relativize' },
+  // 未实测：不知道宿主吞掉解析异常后是丢弃文件还是照常加载。不猜，报告里照实说不确定。
+  unparsedFrontmatter: 'unverified' as const,
   limits: {},
   install: {
     strategy: {

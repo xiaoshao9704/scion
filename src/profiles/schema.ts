@@ -39,6 +39,7 @@ export const EcosystemProfileSchema = z.object({
     z.object({ kind: z.literal('rename'), to: z.string() }),
     z.object({ kind: z.literal('relativize') }),
   ]),
+  unparsedFrontmatter: z.enum(['drops-the-file', 'keeps-the-file', 'unverified']),
   namePattern: z.string().optional(),
   limits: z.object({
     fieldBytes: z.number().optional(),

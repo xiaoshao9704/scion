@@ -152,6 +152,15 @@ export interface EcosystemProfile {
   pathVar: string | null;
   /** 从其他生态转入时如何处理对方的路径变量 */
   pathVarStrategy: PathVarStrategy;
+  /**
+   * 宿主自己解析 commands / agents 的 frontmatter 失败时会怎样。scion 转不动这种文件
+   * 时会原样复制，而"原样复制"的后果完全取决于目标端——所以它是生态事实，不是引擎行为。
+   *
+   * - 'drops-the-file'：宿主吞掉解析异常并丢弃这个文件，该命令/agent 在目标端根本不存在
+   * - 'keeps-the-file'：宿主容忍，文件仍然可用（只是字段没被重映射）
+   * - 'unverified'：没实测过。不猜，照实说不确定
+   */
+  unparsedFrontmatter: 'drops-the-file' | 'keeps-the-file' | 'unverified';
   /** name 的正则约束（源字符串）；undefined 表示无约束 */
   namePattern?: string;
   limits: { fieldBytes?: number; totalInstructionBytes?: number };
