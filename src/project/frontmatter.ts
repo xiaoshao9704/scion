@@ -44,9 +44,10 @@ export function remapFrontmatter(
       'drops-the-file':
         `${to.id} parses this frontmatter too, and drops the whole file when it cannot: this ` +
         `${singular} will not exist there at all — no error, no degraded version`,
-      'keeps-the-file':
-        `${to.id} still loads the file, so the ${singular} works, but no field was remapped for it ` +
-        `and any ${from.id}-only field stays in it`,
+      'drops-the-metadata':
+        `${to.id} cannot parse it either: it loads the file and runs the body, but treats the ` +
+        `frontmatter as empty, so everything declared there is silently not applied — including any ` +
+        `tool allowlist, which means this ${singular} runs unrestricted`,
       unverified:
         `whether ${to.id} still loads a file it cannot parse is untested — it may work with no field ` +
         `remapped, or be dropped entirely`,

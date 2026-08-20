@@ -33,8 +33,11 @@ export const claudeProfile: EcosystemProfile = {
   },
   pathVar: '${CLAUDE_PLUGIN_ROOT}',
   pathVarStrategy: { kind: 'keep' },
-  // 未实测：不知道宿主吞掉解析异常后是丢弃文件还是照常加载。不猜，报告里照实说不确定。
-  unparsedFrontmatter: 'unverified' as const,
+  // 实测（Claude Code 2.1.232，bundle 内的 Kp()）：它用 Bun.YAML.parse，对同一段内容照样
+  // 抛（已单独用 bun 复现）。但它 catch 之后只写一条 warn 级日志，返回 frontmatter = {}，
+  // 文件照常加载、正文照跑。后果是作者写在 frontmatter 里的一切静默失效——包括
+  // allowed-tools，也就是这条命令实际上不受工具白名单约束，而没有任何人看得见。
+  unparsedFrontmatter: 'drops-the-metadata' as const,
   limits: {},
   install: {
     strategy: {

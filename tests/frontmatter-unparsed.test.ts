@@ -72,6 +72,17 @@ describe('the consequence is read from the target profile, never assumed', () =>
     expect(hit.message).not.toMatch(/will not exist there at all/);
   });
 
+  // Claude 侧实测：文件留着、正文照跑，但 frontmatter 被当成空的，allowed-tools 随之失效
+  it('says the metadata is silently dropped for an ecosystem that keeps the file', () => {
+    const out = remapFrontmatter(BAD, 'commands', kimi, claude, 'commands/profile.md');
+    const hit = out.findings.find((f) => f.code === 'frontmatter.unparsed')!;
+    expect(claude.unparsedFrontmatter).toBe('drops-the-metadata');
+    expect(hit.message).toMatch(/treats the frontmatter as empty/);
+    expect(hit.message).toMatch(/runs unrestricted/);
+    // 文件没丢，所以不能说成「根本不存在」
+    expect(hit.message).not.toMatch(/will not exist there at all/);
+  });
+
   it('names the right kind of file', () => {
     const asAgent = remapFrontmatter(BAD, 'agents', claude, kimi, 'agents/x.md');
     expect(asAgent.findings[0].message).toMatch(/this agent will not exist/);

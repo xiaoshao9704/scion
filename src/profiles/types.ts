@@ -157,10 +157,11 @@ export interface EcosystemProfile {
    * 时会原样复制，而"原样复制"的后果完全取决于目标端——所以它是生态事实，不是引擎行为。
    *
    * - 'drops-the-file'：宿主吞掉解析异常并丢弃这个文件，该命令/agent 在目标端根本不存在
-   * - 'keeps-the-file'：宿主容忍，文件仍然可用（只是字段没被重映射）
+   * - 'drops-the-metadata'：宿主保留文件并照常加载，但把 frontmatter 当成空的——作者
+   *   在那里声明的一切（描述、权限白名单）静默失效，而正文照跑
    * - 'unverified'：没实测过。不猜，照实说不确定
    */
-  unparsedFrontmatter: 'drops-the-file' | 'keeps-the-file' | 'unverified';
+  unparsedFrontmatter: 'drops-the-file' | 'drops-the-metadata' | 'unverified';
   /** name 的正则约束（源字符串）；undefined 表示无约束 */
   namePattern?: string;
   limits: { fieldBytes?: number; totalInstructionBytes?: number };
