@@ -1,14 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 — 2026-08-25
 
 - **Hooks now convert from Claude to Kimi.** Measured against the Kimi binary:
   its hook event set is a strict superset of Claude's with identical names, and
   plugin hooks run with the plugin root as cwd. `hooks/hooks.json` flattens
   into the `hooks` array of `kimi.plugin.json`; `${CLAUDE_PLUGIN_ROOT}` becomes
   a relative path (INFO), timeouts clamp to Kimi's 1–600s range and dropped
-  `async` / `shell` fields are each reported as a LOSS. Codex hooks stay
-  report-only until its plugin-level declaration is verified.
+  `async` / `shell` fields are each reported as a LOSS.
+- **Hooks now convert from Claude to Codex too.** Measured against the codex
+  binary and real installed plugins: a Codex plugin declares hooks with a
+  `"hooks": "./…"` path reference in its manifest, and the file is Claude's
+  own envelope format. The conversion filters out the two events Codex lacks
+  (`SessionEnd`, `Notification` — each a LOSS), rewrites
+  `${CLAUDE_PLUGIN_ROOT}` to a relative path and passes everything else
+  through untouched as `hooks/codex-hooks.json`. An INFO notes Codex's
+  `plugin_hooks` feature gate.
 - **New command: `scion uninstall <name> [--to codex,kimi]`** — deregisters on
   the target (`codex plugin remove` / the Kimi registry, with backup), removes
   the catalog entry and converted files, and forgets the ledger record. A

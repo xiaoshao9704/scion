@@ -47,6 +47,12 @@ export const EcosystemProfileSchema = z.object({
       events: z.array(z.string()),
       timeoutMaxSeconds: z.number().int().positive(),
     }),
+    z.object({
+      kind: z.literal('claude-envelope-file'),
+      file: z.string(),
+      events: z.array(z.string()),
+      note: z.string().optional(),
+    }),
     z.object({ kind: z.literal('none') }),
   ]),
   namePattern: z.string().optional(),

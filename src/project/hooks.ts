@@ -1,5 +1,6 @@
 import type { Finding, PluginIR } from '../ir/types.js';
 import type { EcosystemProfile } from '../profiles/types.js';
+import type { EmittedFile } from './types.js';
 import { loadProfile } from '../profiles/loader.js';
 
 interface KimiHookDef {
@@ -9,15 +10,18 @@ interface KimiHookDef {
   timeout?: number;
 }
 
+interface ProjectedHooks {
+  manifestValue?: unknown;
+  files?: EmittedFile[];
+  findings: Finding[];
+}
+
 /**
  * 把 Claude 的 hooks/hooks.json（{hooks: {事件: [{matcher?, hooks: [{type, command, …}]}]}}）
  * 投影成目标清单里的扁平数组。目标不支持（hooksDialect 'none'）或源解析不了时，
  * 回落为 not-converted 的 LOSS——和 v1 的行为一致，只是措辞按目标说清楚。
  */
-export function projectHooks(
-  ir: PluginIR,
-  target: EcosystemProfile,
-): { manifestValue?: KimiHookDef[]; findings: Finding[] } {
+export function projectHooks(ir: PluginIR, target: EcosystemProfile): ProjectedHooks {
   const files = ir.capabilities.hooks;
   if (files.length === 0) return { findings: [] };
 
@@ -54,6 +58,10 @@ export function projectHooks(
         },
       ],
     };
+  }
+
+  if (dialect.kind === 'claude-envelope-file') {
+    return projectEnvelopeFile(ir, target, events as Record<string, unknown>, dialect);
   }
 
   const findings: Finding[] = [];
@@ -132,8 +140,68 @@ export function projectHooks(
 }
 
 /**
+ * 目标端直接吃 Claude 信封格式（实测 Codex 如此）：不改结构，只过滤目标没有的事件、
+ * 改写命令里的路径变量，然后把整个信封写成目标约定的文件，清单用路径引用指过去。
+ * type / timeout / matcher 等字段原样透传——格式相同就不该动它们。
+ */
+function projectEnvelopeFile(
+  ir: PluginIR,
+  target: EcosystemProfile,
+  events: Record<string, unknown>,
+  dialect: { file: string; events: readonly string[]; note?: string },
+): ProjectedHooks {
+  const findings: Finding[] = [];
+  const kept: Record<string, unknown> = {};
+
+  for (const [event, groups] of Object.entries(events)) {
+    if (!Array.isArray(groups)) continue;
+    if (!dialect.events.includes(event)) {
+      findings.push({
+        level: 'LOSS',
+        code: 'hooks.event-unsupported',
+        message: `${target.id} has no ${event} hook event; the hooks declared under it are dropped`,
+        where: `hooks/hooks.json#${event}`,
+      });
+      continue;
+    }
+    kept[event] = groups.map((group) => {
+      if (group === null || typeof group !== 'object') return group;
+      const g = group as Record<string, unknown>;
+      if (!Array.isArray(g.hooks)) return group;
+      return {
+        ...g,
+        hooks: g.hooks.map((def) => {
+          if (def === null || typeof def !== 'object') return def;
+          const d = def as Record<string, unknown>;
+          if (typeof d.command !== 'string') return def;
+          return { ...d, command: relativizeCommand(d.command, ir, target, event, findings) };
+        }),
+      };
+    });
+  }
+
+  if (Object.keys(kept).length === 0) return { findings };
+
+  if (dialect.note) {
+    findings.push({
+      level: 'INFO',
+      code: 'hooks.converted',
+      message: dialect.note,
+      where: dialect.file,
+    });
+  }
+
+  return {
+    manifestValue: `./${dialect.file}`,
+    files: [{ path: dialect.file, content: `${JSON.stringify({ hooks: kept }, null, 2)}\n` }],
+    findings,
+  };
+}
+
+/**
  * hook 命令里的源生态插件根变量改写为相对路径。对 Kimi 这是保真的：实测宿主给
  * hook 进程 cwd=插件根，所以是 INFO 而不是 pathvar.relativized 那样的 LOSS。
+ * Codex 侧的实测约定同样是插件根相对路径（真实插件的 hook 命令写 ./hooks/…）。
  */
 function relativizeCommand(
   command: string,

@@ -147,10 +147,14 @@ export interface MarketplaceDialect {
  * - 'manifest-array'：hooks 声明在插件清单的 hooks 字段里，扁平数组
  *   `[{event, matcher?, command, timeout?}]`；events 是目标支持的事件枚举，
  *   timeoutMaxSeconds 是 timeout 的上限（单位秒）。
+ * - 'claude-envelope-file'：目标端直接吃 Claude 的 hooks.json 信封格式，清单里用
+ *   路径引用指向它（`"hooks": "./<file>"`）。转换只做两件事：按 events 过滤目标
+ *   没有的事件，改写路径变量。file 是产物里 hooks 文件的相对路径。
  * - 'none'：目标端的插件级 hooks 声明方式未知或不存在；scion 不转换，doctor 报告。
  */
 export type HooksDialect =
   | { kind: 'manifest-array'; events: readonly string[]; timeoutMaxSeconds: number }
+  | { kind: 'claude-envelope-file'; file: string; events: readonly string[]; note?: string }
   | { kind: 'none' };
 
 export interface EcosystemProfile {

@@ -63,9 +63,28 @@ export const codexProfile: EcosystemProfile = {
   // !` 并列；且官方 marketplace 原样安装带 !`cmd` 的 Claude commands（commit-commands）。
   // 强烈暗示支持，但未运行时验证——所以是 unverified 而不是 runs。
   inlineBash: 'unverified' as const,
-  // ~/.codex/hooks.json 是 Claude 的信封结构（实机配置可证），但插件级 hooks 怎么声明
-  // 未确认——在确认之前不转换，只报告。
-  hooksDialect: { kind: 'none' as const },
+  // 实测（codex-cli 0.133.0 二进制 + 本机真实插件）：插件级 hooks 在 plugin.json 里
+  // 用路径引用声明（"hooks": "./hooks/codex-hooks.json"），文件就是 Claude 的信封格式；
+  // hook_runtime.rs 真实执行（PreToolUse 能拦截命令）。事件枚举取自二进制的
+  // ManagedHooksRequirements：比 Claude 少 SessionEnd 和 Notification。
+  // 产物文件名跟随实测到的 codex-hooks.json 约定，不动源 hooks/hooks.json。
+  hooksDialect: {
+    kind: 'claude-envelope-file' as const,
+    file: 'hooks/codex-hooks.json',
+    events: [
+      'PreToolUse',
+      'PermissionRequest',
+      'PostToolUse',
+      'PreCompact',
+      'PostCompact',
+      'SessionStart',
+      'UserPromptSubmit',
+      'SubagentStart',
+      'SubagentStop',
+      'Stop',
+    ],
+    note: 'codex gates plugin hooks behind the plugin_hooks experimental feature; enable it in codex if the hooks do not fire',
+  },
   limits: {},
   install: {
     strategy: {

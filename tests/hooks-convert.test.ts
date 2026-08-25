@@ -131,12 +131,72 @@ describe('hooks conversion claude → kimi', () => {
     expect(f?.message).toMatch(/parse/);
   });
 
-  it('still reports not-converted for codex, whose plugin-level hooks are unverified', async () => {
+  it('reports nothing when the plugin has no hooks (kimi)', async () => {
+    const root = await makePluginDir({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
+    });
+    const out = project(await normalize(root, claude), kimi);
+    expect(out.manifest.hooks).toBeUndefined();
+    expect(out.findings.some((n) => n.code.startsWith('hooks.'))).toBe(false);
+  });
+});
+
+describe('hooks conversion claude → codex', () => {
+  it('keeps the Claude envelope, written as a codex-hooks.json path reference', async () => {
     const ir = await pluginWithHooks(HOOKS_JSON);
     const out = project(ir, codex);
+    expect(out.manifest.hooks).toBe('./hooks/codex-hooks.json');
+    const file = out.files.find((f) => f.path === 'hooks/codex-hooks.json');
+    const parsed = JSON.parse(file!.content);
+    expect(parsed.hooks.SessionStart).toEqual([
+      {
+        matcher: 'startup|clear|compact',
+        hooks: [
+          {
+            type: 'command',
+            command: '"./hooks/run-hook.cmd" session-start',
+            shell: 'bash',
+            async: false,
+          },
+        ],
+      },
+    ]);
+    expect(out.findings.some((f) => f.code === 'hooks.not-converted')).toBe(false);
+  });
+
+  it('drops the events codex does not have and reports each loss', async () => {
+    const ir = await pluginWithHooks(
+      JSON.stringify({
+        hooks: {
+          SessionEnd: [{ hooks: [{ type: 'command', command: 'x' }] }],
+          Notification: [{ hooks: [{ type: 'command', command: 'y' }] }],
+          Stop: [{ hooks: [{ type: 'command', command: 'z' }] }],
+        },
+      }),
+    );
+    const out = project(ir, codex);
+    const parsed = JSON.parse(out.files.find((f) => f.path === 'hooks/codex-hooks.json')!.content);
+    expect(Object.keys(parsed.hooks)).toEqual(['Stop']);
+    const dropped = out.findings.filter((f) => f.code === 'hooks.event-unsupported');
+    expect(dropped.map((f) => f.message).join(' ')).toMatch(/SessionEnd/);
+    expect(dropped.map((f) => f.message).join(' ')).toMatch(/Notification/);
+  });
+
+  it('emits nothing when every event is unsupported', async () => {
+    const ir = await pluginWithHooks(
+      JSON.stringify({ hooks: { SessionEnd: [{ hooks: [{ type: 'command', command: 'x' }] }] } }),
+    );
+    const out = project(ir, codex);
     expect(out.manifest.hooks).toBeUndefined();
-    const f = out.findings.find((n) => n.code === 'hooks.not-converted');
-    expect(f?.level).toBe('LOSS');
+    expect(out.files.some((f) => f.path === 'hooks/codex-hooks.json')).toBe(false);
+  });
+
+  it('mentions the plugin_hooks feature gate as an INFO', async () => {
+    const ir = await pluginWithHooks(HOOKS_JSON);
+    const out = project(ir, codex);
+    const f = out.findings.find((n) => n.code === 'hooks.converted');
+    expect(f?.level).toBe('INFO');
+    expect(f?.message).toContain('plugin_hooks');
   });
 
   it('reports nothing when the plugin has no hooks', async () => {

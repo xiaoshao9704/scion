@@ -112,8 +112,13 @@ export function projectManifest(
   }
 
   const hooks = projectHooks(ir, target);
-  if (hooks.manifestValue) manifest.hooks = hooks.manifestValue;
+  if (hooks.manifestValue !== undefined) manifest.hooks = hooks.manifestValue;
   findings.push(...hooks.findings);
 
-  return { manifest, files: mcp.files, findings, envVars: mcp.envVars };
+  return {
+    manifest,
+    files: [...mcp.files, ...(hooks.files ?? [])],
+    findings,
+    envVars: mcp.envVars,
+  };
 }

@@ -250,3 +250,22 @@ v1 推迟 hooks 转换时说"积累实测后再做"。用 superpowers 6.3.0 完�
 remove superpowers@scion`）后，scion 台账仍显示 `[registered]`——没有
 `scion uninstall`，`list` 对 codex 端也不做漂移检测（kimi 端会显示
 not registered）。
+
+### 补充（同日晚些时候）：Codex 插件级 hooks 已确认，转换已实现
+
+上文"插件级 hooks 如何声明未确认"已解决。实测（codex-cli 0.133.0 二进制 +
+本机真实插件 member-skills）：
+
+- 插件在 `.codex-plugin/plugin.json` 里用路径引用声明：`"hooks": "./hooks/codex-hooks.json"`，
+  与 mcpServers 的路径引用风格一致；文件内容就是 Claude 的信封格式，逐字段相同。
+- 事件枚举（二进制 ManagedHooksRequirements，两处一致）：PreToolUse、PermissionRequest、
+  PostToolUse、PreCompact、PostCompact、SessionStart、UserPromptSubmit、SubagentStart、
+  SubagentStop、Stop——比 Claude 少 SessionEnd 和 Notification。
+- hooks 真实执行：core/src/hook_runtime.rs，"Command blocked by PreToolUse hook"。
+- 注意：plugin_hooks 在实验特性开关列表里，可能需要用户启用。
+- 真实插件同时手工维护 hooks.json（Claude）与 codex-hooks.json（内容雷同）——
+  又一个 scion 要消灭的手工多份清单案例。
+
+因此 Claude → Codex 的 hooks 转换是**过滤加透传**：滤掉两个目标没有的事件（LOSS）、
+改写路径变量，其余原样写成 hooks/codex-hooks.json，清单指过去。三个生态的 hooks
+至此全部打通，v1 当年最大的推迟项关闭。

@@ -109,16 +109,18 @@ necessarily the same secret.
 ## What scion converts
 
 Metadata, `interface` / presentation fields, skills, commands, agents, MCP
-servers and hooks, from Claude to Kimi; everything except hooks from Claude to
-Codex.
+servers and hooks, from Claude to Kimi and from Claude to Codex.
 
-**Hooks convert to Kimi because the mapping is measured, not guessed.** Kimi's
-hook event set is a strict superset of Claude's with identical names, and its
-plugin hooks run with the plugin root as the working directory — so the
-conversion is a structural rewrite, with every dropped detail (`async`,
-`shell`, an out-of-range timeout) reported as a LOSS. Codex hooks stay
-report-only: how a Codex *plugin* declares hooks is still unverified, and a
-hook that fires at the wrong moment does not fail, it runs the wrong thing.
+**Hooks convert because the mappings are measured, not guessed.** Kimi's hook
+event set is a strict superset of Claude's with identical names, so the
+nested `hooks/hooks.json` flattens into the manifest's `hooks` array, with
+every dropped detail (`async`, `shell`, an out-of-range timeout) reported as
+a LOSS. Codex reads Claude's own envelope format through a `"hooks"` path
+reference in the plugin manifest, so the conversion filters out the two
+events Codex lacks (`SessionEnd`, `Notification`) and passes the rest
+through byte-faithful. A hook that fires at the wrong moment does not fail,
+it runs the wrong thing — which is why unsupported events are dropped loudly
+instead of remapped speculatively.
 
 Not supported: runtime shims, and the reverse direction (Kimi or Codex back to
 Claude).
