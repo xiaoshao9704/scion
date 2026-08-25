@@ -212,3 +212,41 @@ TypeScript + Node，通过 npm 分发（`npx @scion/cli`）。
    **结论**：**Kimi 不支持**——二进制内 `expandCommandArguments` 只做 `$ARGUMENTS` 字符串替换，`` !`cmd` `` 原文进入模型上下文、命令不执行（profile `inlineBash: 'literal'`，doctor 报 LOSS）。**Codex 强证据支持但未运行时验证**——命令模板 token 表里 `$ARGUMENTS`、`{{}}` 与 `` !` `` 并列，且官方 marketplace 原样安装带内联 bash 的 commit-commands（profile `inlineBash: 'unverified'`，doctor 报 INFO）。
 4. Kimi commands 是否支持 `argument-hint`。
    **结论**：**支持**——TUI 将其渲染为补全时的灰色提示文本（"Splice a dimmed argument-hint ghost string…"）。profile 改为无损照搬。
+
+## hooks 实测证据（2026-08-25 dogfood）
+
+v1 推迟 hooks 转换时说"积累实测后再做"。用 superpowers 6.3.0 完整 dogfood
+`install --to codex,kimi` 后取到的证据（codex-cli 0.133.0、Kimi 0.36.1）：
+
+**三方事件模型（均取自二进制）：**
+
+- Claude：`{hooks: {事件名: [{matcher, hooks: [{type:"command", command, timeout, async?, shell?}]}]}}`，
+  事件名 PascalCase，`${CLAUDE_PLUGIN_ROOT}` 由宿主在执行前展开。
+- Kimi：**事件枚举是 Claude 的严格超集**（20 个：PreToolUse、PostToolUse、
+  PostToolUseFailure、PermissionRequest、PermissionResult、UserPromptSubmit、
+  UserPromptQueued、TurnStarted、Stop、StopFailure、Interrupt、SessionStart、
+  SessionEnd、SessionHeartbeat、SubagentStart、SubagentStop、TaskStarted、
+  PreCompact、PostCompact、Notification），Claude 的每个事件都在其中、同名同
+  casing。插件 hooks 声明在 `kimi.plugin.json` 的 `hooks` 字段，**扁平数组**
+  `[{event, matcher?, command, timeout?}]`，timeout 为秒、int、1–600。运行时
+  `enabledHooks()` 给每条 hook 附 `cwd: 插件根` 和 env `KIMI_PLUGIN_ROOT` /
+  `KIMI_CODE_HOME`。二进制内**没有** `CLAUDE_PLUGIN_ROOT` 字符串——不展开
+  Claude 的路径变量；`$KIMI_PLUGIN_ROOT` 靠 shell env 在运行时解析，或直接用
+  相对路径（cwd 已是插件根）。
+- Codex：`~/.codex/hooks.json` 用的就是 Claude 的信封结构（实机配置可证：
+  `{hooks: {UserPromptSubmit: [{hooks: [{type:"command", command, timeout}]}]}}`），
+  事件集（二进制）：PreToolUse、PermissionRequest、PostToolUse、PreCompact、
+  PostCompact、SessionStart、SubagentStart、SubagentStop，另在实机配置中见
+  UserPromptSubmit。插件级 hooks 如何声明未确认。
+
+**对 hooks 转换的含义：** Claude → Kimi 是结构改写而非语义猜测——事件名照搬
+（超集保证全部命中）、嵌套转扁平、`${CLAUDE_PLUGIN_ROOT}` → `$KIMI_PLUGIN_ROOT`
+（或依赖 cwd 转相对路径）、timeout 需换算并夹到 1–600 秒、Claude 的 `async` /
+`shell` 字段 Kimi 无对应（丢弃需报 LOSS）。当年"三方事件模型未必一一对应"的
+担忧对 Kimi 不成立，对 Codex 部分成立（缺 Stop / SessionEnd 等，且插件级声明
+方式未知）。
+
+**dogfood 发现的产品缺口：** 在目标端用宿主自己的手段卸载（`codex plugin
+remove superpowers@scion`）后，scion 台账仍显示 `[registered]`——没有
+`scion uninstall`，`list` 对 codex 端也不做漂移检测（kimi 端会显示
+not registered）。
