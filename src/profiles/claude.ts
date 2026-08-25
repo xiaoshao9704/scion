@@ -39,6 +39,8 @@ export const claudeProfile: EcosystemProfile = {
   // allowed-tools，也就是这条命令实际上不受工具白名单约束，而没有任何人看得见。
   unparsedFrontmatter: 'drops-the-metadata' as const,
   inlineBash: 'runs' as const,
+  // Claude 是转换的源生态；反向（转入 Claude）不支持，无需声明它的 hooks 方言。
+  hooksDialect: { kind: 'none' as const },
   limits: {},
   install: {
     strategy: {

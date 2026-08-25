@@ -63,6 +63,9 @@ export const codexProfile: EcosystemProfile = {
   // !` 并列；且官方 marketplace 原样安装带 !`cmd` 的 Claude commands（commit-commands）。
   // 强烈暗示支持，但未运行时验证——所以是 unverified 而不是 runs。
   inlineBash: 'unverified' as const,
+  // ~/.codex/hooks.json 是 Claude 的信封结构（实机配置可证），但插件级 hooks 怎么声明
+  // 未确认——在确认之前不转换，只报告。
+  hooksDialect: { kind: 'none' as const },
   limits: {},
   install: {
     strategy: {

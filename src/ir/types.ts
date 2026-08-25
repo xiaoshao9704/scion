@@ -67,8 +67,13 @@ export interface PluginCapabilities {
   skills: CapabilityDir | null;
   commands: CapabilityDir | null;
   agents: CapabilityDir | null;
-  /** v1 只报告不转换；相对插件根的文件路径 */
+  /** hooks/ 下的文件，相对插件根的路径 */
   hooks: string[];
+  /**
+   * hooks/hooks.json 解析后的内容；文件不存在或不是合法 JSON 时为 undefined。
+   * 两种情况靠 hooks 里有没有 'hooks/hooks.json' 区分——列表里有而这里没有，就是解析失败。
+   */
+  hooksConfig?: unknown;
   /** 已摘掉鉴权记法的 server 配置，其余字段原样保留 */
   mcpServers: Record<string, McpServerConfig>;
   /** 与 mcpServers 同键；没有任何鉴权事实的 server 不出现在这里 */

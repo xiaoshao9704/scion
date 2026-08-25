@@ -54,6 +54,7 @@ const CapabilitiesSchema = z.object({
   commands: CapabilityDirSchema.nullable(),
   agents: CapabilityDirSchema.nullable(),
   hooks: z.array(z.string()),
+  hooksConfig: z.unknown().optional(),
   mcpServers: z.record(z.record(z.unknown())),
   mcpAuth: z.record(McpServerAuthSchema),
 });

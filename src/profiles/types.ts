@@ -141,6 +141,18 @@ export interface MarketplaceDialect {
   remoteFetch: RemoteFetchSpec;
 }
 
+/**
+ * 目标端怎么承载插件 hooks。
+ *
+ * - 'manifest-array'：hooks 声明在插件清单的 hooks 字段里，扁平数组
+ *   `[{event, matcher?, command, timeout?}]`；events 是目标支持的事件枚举，
+ *   timeoutMaxSeconds 是 timeout 的上限（单位秒）。
+ * - 'none'：目标端的插件级 hooks 声明方式未知或不存在；scion 不转换，doctor 报告。
+ */
+export type HooksDialect =
+  | { kind: 'manifest-array'; events: readonly string[]; timeoutMaxSeconds: number }
+  | { kind: 'none' };
+
 export interface EcosystemProfile {
   id: EcosystemId;
   /** 候选清单路径，按优先级从高到低 */
@@ -171,6 +183,7 @@ export interface EcosystemProfile {
    * - 'unverified'：有间接证据但未运行时实测。不猜，照实说不确定
    */
   inlineBash: 'runs' | 'literal' | 'unverified';
+  hooksDialect: HooksDialect;
   /** name 的正则约束（源字符串）；undefined 表示无约束 */
   namePattern?: string;
   limits: { fieldBytes?: number; totalInstructionBytes?: number };

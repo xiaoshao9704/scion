@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CapabilityDir, Finding, Provenance } from '../ir/types.js';
 
@@ -138,7 +138,22 @@ async function collectMarkdownFiles(
   return out;
 }
 
-/** hooks 只登记不解析；v1 不转换 */
+/** hooks/hooks.json 是 Claude 的 hooks 声明；能解析就带上，转换阶段用 */
+export async function readHooksConfig(root: string): Promise<unknown> {
+  let raw: string;
+  try {
+    raw = await readFile(join(root, 'hooks', 'hooks.json'), 'utf8');
+  } catch {
+    return undefined;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // 文件在 scanHooks 的列表里、这里却是 undefined——投影阶段以此识别解析失败并报 LOSS
+    return undefined;
+  }
+}
+
 export async function scanHooks(root: string): Promise<string[]> {
   const rel = 'hooks';
   let names: string[];

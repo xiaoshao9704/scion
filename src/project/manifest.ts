@@ -2,6 +2,7 @@ import type { Finding, PluginIR } from '../ir/types.js';
 import type { EcosystemProfile } from '../profiles/types.js';
 import type { EmittedFile, ProjectionOptions } from './types.js';
 import { projectMcpServers } from './mcp.js';
+import { projectHooks } from './hooks.js';
 import type { EnvVarUse } from '../mcp/env.js';
 import { getSkillInstructions } from '../toolmap/index.js';
 
@@ -110,14 +111,9 @@ export function projectManifest(
     }
   }
 
-  if (ir.capabilities.hooks.length > 0) {
-    findings.push({
-      level: 'LOSS',
-      code: 'hooks.not-converted',
-      message: `${ir.capabilities.hooks.length} hooks ${ir.capabilities.hooks.length === 1 ? 'file' : 'files'} not converted (v1 does not convert hooks): ${ir.capabilities.hooks.join(', ')}`,
-      where: 'hooks/',
-    });
-  }
+  const hooks = projectHooks(ir, target);
+  if (hooks.manifestValue) manifest.hooks = hooks.manifestValue;
+  findings.push(...hooks.findings);
 
   return { manifest, files: mcp.files, findings, envVars: mcp.envVars };
 }

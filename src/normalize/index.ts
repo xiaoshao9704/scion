@@ -3,7 +3,7 @@ import type { PluginIR, PluginIdentity, Provenance } from '../ir/types.js';
 import type { EcosystemProfile } from '../profiles/types.js';
 import { emptyIR } from '../ir/schema.js';
 import { findManifest } from './manifest.js';
-import { scanCapabilityDir, scanHooks } from './scan.js';
+import { readHooksConfig, scanCapabilityDir, scanHooks } from './scan.js';
 import { readMcpServers } from './mcp.js';
 
 export { findManifest } from './manifest.js';
@@ -88,6 +88,7 @@ export async function normalize(root: string, profile: EcosystemProfile): Promis
   }
 
   ir.capabilities.hooks = await scanHooks(abs);
+  ir.capabilities.hooksConfig = await readHooksConfig(abs);
 
   const mcp = await readMcpServers(abs, raw, profile);
   ir.capabilities.mcpServers = mcp.servers;

@@ -53,6 +53,35 @@ export const kimiProfile: EcosystemProfile = {
   // 实测（Kimi 0.36.1，二进制内 expandCommandArguments）：command 正文只做 $ARGUMENTS
   // 字符串替换，没有任何 !`cmd` 处理路径——内联 bash 原文进入模型上下文，命令不执行。
   inlineBash: 'literal' as const,
+  // 实测（Kimi 0.36.1 二进制 hookDefSchema + enabledHooks()）：插件 hooks 声明在
+  // kimi.plugin.json 的 hooks 字段，扁平数组；事件枚举是 Claude 的严格超集；timeout
+  // 为 1–600 的整数秒；运行时 cwd=插件根，并注入 KIMI_PLUGIN_ROOT / KIMI_CODE_HOME。
+  hooksDialect: {
+    kind: 'manifest-array' as const,
+    events: [
+      'PreToolUse',
+      'PostToolUse',
+      'PostToolUseFailure',
+      'PermissionRequest',
+      'PermissionResult',
+      'UserPromptSubmit',
+      'UserPromptQueued',
+      'TurnStarted',
+      'Stop',
+      'StopFailure',
+      'Interrupt',
+      'SessionStart',
+      'SessionEnd',
+      'SessionHeartbeat',
+      'SubagentStart',
+      'SubagentStop',
+      'TaskStarted',
+      'PreCompact',
+      'PostCompact',
+      'Notification',
+    ],
+    timeoutMaxSeconds: 600,
+  },
   namePattern: '^[a-z0-9][a-z0-9_-]{0,63}$',
   limits: { fieldBytes: 32768, totalInstructionBytes: 65536 },
   install: {
