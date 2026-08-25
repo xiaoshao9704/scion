@@ -40,6 +40,7 @@ export const EcosystemProfileSchema = z.object({
     z.object({ kind: z.literal('relativize') }),
   ]),
   unparsedFrontmatter: z.enum(['drops-the-file', 'drops-the-metadata', 'unverified']),
+  inlineBash: z.enum(['runs', 'literal', 'unverified']),
   namePattern: z.string().optional(),
   limits: z.object({
     fieldBytes: z.number().optional(),

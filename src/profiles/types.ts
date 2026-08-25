@@ -162,6 +162,15 @@ export interface EcosystemProfile {
    * - 'unverified'：没实测过。不猜，照实说不确定
    */
   unparsedFrontmatter: 'drops-the-file' | 'drops-the-metadata' | 'unverified';
+  /**
+   * 目标端如何处置 command 正文里的 !`cmd` 内联 bash。scion 原样保留正文，后果取决于
+   * 宿主——所以同 unparsedFrontmatter 一样是生态事实，不是引擎行为。
+   *
+   * - 'runs'：宿主先执行命令、把输出注入正文（Claude Code 的行为）
+   * - 'literal'：宿主不识别，!`cmd` 作为字面文本进入模型上下文——命令不执行，语义静默改变
+   * - 'unverified'：有间接证据但未运行时实测。不猜，照实说不确定
+   */
+  inlineBash: 'runs' | 'literal' | 'unverified';
   /** name 的正则约束（源字符串）；undefined 表示无约束 */
   namePattern?: string;
   limits: { fieldBytes?: number; totalInstructionBytes?: number };

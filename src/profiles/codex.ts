@@ -38,7 +38,10 @@ export const codexProfile: EcosystemProfile = {
     agents: {
       name: { to: 'name', lossy: false },
       description: { to: 'description', lossy: false },
-      // spec 待确认 #1：Codex 侧未观察到 agents/ 目录，先按直通处理并由 doctor 报 INFO
+      // 实测（codex-cli 0.133.0）：目标端没有 agents/ 目录约定，但官方 marketplace 会
+      // 原样安装带 agents/ 的插件（cache 里 code-simplifier、didi-ee-toolkit 均有），且
+      // 二进制存在 subagent 机制（SubagentStart/Stop hook 事件、"No subagent instructions
+      // were found."）。是否真正加载 agents/*.md 仍未验证——维持直通 + doctor 报 INFO。
       model: { to: 'model', lossy: false },
       tools: { to: 'tools', lossy: false },
     },
@@ -56,6 +59,10 @@ export const codexProfile: EcosystemProfile = {
   pathVarStrategy: { kind: 'relativize' },
   // 未实测：不知道宿主吞掉解析异常后是丢弃文件还是照常加载。不猜，报告里照实说不确定。
   unparsedFrontmatter: 'unverified' as const,
+  // 两条间接证据（codex-cli 0.133.0）：二进制的命令模板 token 表里 $ARGUMENTS、{{}} 与
+  // !` 并列；且官方 marketplace 原样安装带 !`cmd` 的 Claude commands（commit-commands）。
+  // 强烈暗示支持，但未运行时验证——所以是 unverified 而不是 runs。
+  inlineBash: 'unverified' as const,
   limits: {},
   install: {
     strategy: {

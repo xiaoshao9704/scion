@@ -43,7 +43,7 @@ export async function doctor(
     }
   }
 
-  findings.push(...(await checkInlineBash(ir)));
+  findings.push(...(await checkInlineBash(ir, target)));
 
   if (!target) return { findings, envVars: [] };
 
@@ -92,22 +92,38 @@ export async function doctor(
   return { findings, envVars: projected.envVars };
 }
 
-/** Claude command 支持 !`cmd` 内联 bash；目标端是否支持未经实测，先按有损处理 */
-async function checkInlineBash(ir: PluginIR): Promise<Finding[]> {
+/** Claude command 支持 !`cmd` 内联 bash；后果由目标 profile 的 inlineBash 事实决定 */
+async function checkInlineBash(ir: PluginIR, target?: EcosystemProfile): Promise<Finding[]> {
   const dir = ir.capabilities.commands;
   if (!dir) return [];
+  if (target?.inlineBash === 'runs') return [];
   const out: Finding[] = [];
   for (const entry of dir.entries) {
     const rel = `${dir.path}${entry}`;
     const text = await readFile(join(ir.root, rel), 'utf8');
     if (/!`[^`]+`/.test(text)) {
-      // spec 待确认 #3：目标端是否支持内联 bash 未见于文档、也未实测。同 #1，编号不进用户输出。
-      out.push({
-        level: 'LOSS',
-        code: 'command.inline-bash',
-        message: 'command body contains inline bash (!`cmd`); whether the target supports it is untested',
-        where: rel,
-      });
+      out.push(
+        target?.inlineBash === 'literal'
+          ? {
+              level: 'LOSS',
+              code: 'command.inline-bash',
+              message: `command body contains inline bash (!\`cmd\`); ${target.id} does not run it — the text reaches the model verbatim and the command's output is silently missing`,
+              where: rel,
+            }
+          : target?.inlineBash === 'unverified'
+            ? {
+                level: 'INFO',
+                code: 'command.inline-bash',
+                message: `command body contains inline bash (!\`cmd\`); evidence suggests ${target.id} runs it, but this is unverified`,
+                where: rel,
+              }
+            : {
+                level: 'LOSS',
+                code: 'command.inline-bash',
+                message: 'command body contains inline bash (!`cmd`); whether the target supports it is untested',
+                where: rel,
+              },
+      );
     }
   }
   return out;

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Verified two ecosystem facts against the real binaries (codex-cli 0.133.0,
+Kimi 0.36.1) and corrected what scion asserts:
+
+- Kimi does support `argument-hint` (rendered as ghost text in the TUI), so it
+  is now carried over losslessly instead of being dropped with a LOSS finding.
+- Inline bash in command bodies (`` !`cmd` ``) is now judged per target via a
+  new `inlineBash` profile fact: Kimi never runs it — the text reaches the
+  model verbatim, reported as a LOSS that says so; Codex shows strong evidence
+  of support but is unverified at runtime, downgraded to INFO (no `--yes`
+  needed anymore); with no target given the conservative untested LOSS remains.
+
 ## 0.1.0 — 2026-08-25
 
 Initial public release.

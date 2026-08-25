@@ -202,9 +202,13 @@ TypeScript + Node，通过 npm 分发（`npx @scion/cli`）。
 
 ## 待确认事项
 
-实现期需要补测的事实（不阻塞设计）：
+实现期需要补测的事实（不阻塞设计）。**2026-08-25 实测已全部核对**（codex-cli 0.133.0、Kimi 0.36.1，二进制与本机安装状态取证）：
 
 1. Codex 的 commands / agents 目录约定与安装位置——本机只观察到 `~/.codex/prompts/`（frontmatter 为 `description` + `argument-hint`）和 `~/.codex/rules/`，未见 `agents/`。
+   **结论**：目标端确无 `agents/` 目录约定；但官方 marketplace 原样安装带 `agents/` 的插件（cache 里 code-simplifier、didi-ee-toolkit），二进制有 subagent 机制（SubagentStart/Stop hook 事件）。commands 支持 `$ARGUMENTS` / `$ARGUMENTS[N]` / `$N` 与 `argument-hint`（二进制帮助文本原文）。agents 是否真被加载仍未验证——维持直通 + doctor INFO。
 2. Codex 插件注册表的写法（`~/.codex/plugins/cache/` 之外是否有 lock 文件）。
+   **结论**：没有 lock 文件。注册状态全在 `config.toml` 的 `[plugins."<name>@<marketplace>"]` 与 `[marketplaces.<name>]`（source 支持本地路径 / git URL / sparse_paths），缓存为 `plugins/cache/<market>/<plugin>/<version|local>/`。scion 走 `codex plugin marketplace add` CLI 的策略正确，无需自己写注册表。
 3. Claude command 的 `` !`cmd` `` 内联 bash 在 Codex / Kimi 是否支持。
+   **结论**：**Kimi 不支持**——二进制内 `expandCommandArguments` 只做 `$ARGUMENTS` 字符串替换，`` !`cmd` `` 原文进入模型上下文、命令不执行（profile `inlineBash: 'literal'`，doctor 报 LOSS）。**Codex 强证据支持但未运行时验证**——命令模板 token 表里 `$ARGUMENTS`、`{{}}` 与 `` !` `` 并列，且官方 marketplace 原样安装带内联 bash 的 commit-commands（profile `inlineBash: 'unverified'`，doctor 报 INFO）。
 4. Kimi commands 是否支持 `argument-hint`。
+   **结论**：**支持**——TUI 将其渲染为补全时的灰色提示文本（"Splice a dimmed argument-hint ghost string…"）。profile 改为无损照搬。

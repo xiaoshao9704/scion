@@ -33,16 +33,14 @@ describe('commands frontmatter remap', () => {
     );
   });
 
-  it('keeps argument-hint for codex but drops it for kimi', () => {
-    expect(
-      matter(remapFrontmatter(COMMAND, 'commands', claude, codex, 'c.md').content).data[
-        'argument-hint'
-      ],
-    ).toBe('[branch]');
-
-    const toKimi = remapFrontmatter(COMMAND, 'commands', claude, kimi, 'c.md');
-    expect(matter(toKimi.content).data['argument-hint']).toBeUndefined();
-    expect(toKimi.findings.some((f) => f.where === 'c.md#argument-hint')).toBe(true);
+  it('keeps argument-hint on both targets', () => {
+    // 实测（Kimi 0.36.1 二进制）：TUI 把 argument-hint 渲染成补全时的灰色提示文本，
+    // 字段是被消费的——照搬即可，不再作为损耗丢弃。
+    for (const target of [kimi, codex]) {
+      const out = remapFrontmatter(COMMAND, 'commands', claude, target, 'c.md');
+      expect(matter(out.content).data['argument-hint']).toBe('[branch]');
+      expect(out.findings.some((f) => f.where === 'c.md#argument-hint')).toBe(false);
+    }
   });
 
   it('leaves $ARGUMENTS in the body untouched', () => {

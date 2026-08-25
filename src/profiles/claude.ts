@@ -38,6 +38,7 @@ export const claudeProfile: EcosystemProfile = {
   // 文件照常加载、正文照跑。后果是作者写在 frontmatter 里的一切静默失效——包括
   // allowed-tools，也就是这条命令实际上不受工具白名单约束，而没有任何人看得见。
   unparsedFrontmatter: 'drops-the-metadata' as const,
+  inlineBash: 'runs' as const,
   limits: {},
   install: {
     strategy: {

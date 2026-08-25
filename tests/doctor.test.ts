@@ -28,18 +28,38 @@ describe('doctor', () => {
     expect(findings.some((f) => f.code === 'kimi.name.pattern')).toBe(false);
   });
 
-  it('flags inline bash in commands as unverified', async () => {
+  it('flags inline bash as a definite loss for kimi, which passes it through as text', async () => {
     const root = await makePluginDir({
       '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
       'commands/status.md': '---\ndescription: s\n---\n\nBranch: !`git branch --show-current`\n',
     });
     const { findings } = await doctor(await normalize(root, claude), kimi);
-    expect(findings).toContainEqual(
-      expect.objectContaining({ level: 'LOSS', code: 'command.inline-bash' }),
-    );
-    // 内部 spec 编号对用户毫无用处（他们查不到），但"未经验证"这个实质必须留着
     const finding = findings.find((f) => f.code === 'command.inline-bash')!;
-    expect(finding.message).not.toMatch(/spec TBD/i);
+    expect(finding.level).toBe('LOSS');
+    // 实测结论：Kimi 只展开 $ARGUMENTS，!`cmd` 不执行、原文进模型——消息必须说清后果
+    expect(finding.message).toMatch(/does not run|verbatim|literal/);
+    expect(finding.message).not.toMatch(/unverified|untested/);
+  });
+
+  it('reports inline bash as INFO for codex, where support is evidenced but unverified', async () => {
+    const root = await makePluginDir({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
+      'commands/status.md': '---\ndescription: s\n---\n\nBranch: !`git branch --show-current`\n',
+    });
+    const { findings } = await doctor(await normalize(root, claude), codex);
+    const finding = findings.find((f) => f.code === 'command.inline-bash')!;
+    expect(finding.level).toBe('INFO');
+    expect(finding.message).toMatch(/unverified/);
+  });
+
+  it('keeps the untested inline-bash warning when no target is given', async () => {
+    const root = await makePluginDir({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
+      'commands/status.md': '---\ndescription: s\n---\n\nBranch: !`git branch --show-current`\n',
+    });
+    const { findings } = await doctor(await normalize(root, claude));
+    const finding = findings.find((f) => f.code === 'command.inline-bash')!;
+    expect(finding.level).toBe('LOSS');
     expect(finding.message).toMatch(/unverified|untested/);
   });
 

@@ -33,12 +33,9 @@ export const kimiProfile: EcosystemProfile = {
     },
     commands: {
       description: { to: 'description', lossy: false },
-      // spec 待确认 #4：Kimi commands 是否支持 argument-hint 未见于文档
-      'argument-hint': {
-        to: null,
-        lossy: true,
-        note: 'the Kimi docs do not mention argument-hint; dropped on conversion',
-      },
+      // 实测（Kimi 0.36.1 二进制）：TUI 把 argument-hint 渲染成补全时的灰色提示文本
+      //（"Splice a dimmed argument-hint ghost string…"），字段是被消费的——无损照搬。
+      'argument-hint': { to: 'argument-hint', lossy: false },
       'allowed-tools': {
         to: null,
         lossy: true,
@@ -53,6 +50,9 @@ export const kimiProfile: EcosystemProfile = {
   // 外面是 `try { ... } catch { return; }`，异常被吞掉、返回 undefined。结果是这个命令在
   // Kimi 里根本不存在，既不报错也不降级——所以"原样复制"在 Kimi 这边等于整条命令消失。
   unparsedFrontmatter: 'drops-the-file' as const,
+  // 实测（Kimi 0.36.1，二进制内 expandCommandArguments）：command 正文只做 $ARGUMENTS
+  // 字符串替换，没有任何 !`cmd` 处理路径——内联 bash 原文进入模型上下文，命令不执行。
+  inlineBash: 'literal' as const,
   namePattern: '^[a-z0-9][a-z0-9_-]{0,63}$',
   limits: { fieldBytes: 32768, totalInstructionBytes: 65536 },
   install: {
