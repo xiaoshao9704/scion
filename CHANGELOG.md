@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 — 2026-08-25
 
 Verified two ecosystem facts against the real binaries (codex-cli 0.133.0,
 Kimi 0.36.1) and corrected what scion asserts:
