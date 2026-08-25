@@ -17,6 +17,10 @@ export interface CliIo {
 
 const COMMANDS = ['install', 'convert', 'doctor', 'list', 'sync', 'market'] as const;
 
+function isCommand(s: string): s is (typeof COMMANDS)[number] {
+  return (COMMANDS as readonly string[]).includes(s);
+}
+
 export async function runCli(argv: string[], io: CliIo): Promise<number> {
   const [first] = argv;
   const json = argv.includes('--json');
@@ -33,7 +37,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     return first ? 0 : 1;
   }
 
-  if (!(COMMANDS as readonly string[]).includes(first)) {
+  if (!isCommand(first)) {
     return writeResult(io, json, usageError('scion', `scion: unknown command '${first}'\n\n${usage()}`));
   }
 
@@ -52,9 +56,6 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
         return await runSync(rest, io);
       case 'market':
         return await runMarket(rest, io);
-      default:
-        io.write(`scion: '${first}' not implemented yet\n`);
-        return 1;
     }
   } catch (err) {
     // --json 下 stdout 必须是合法 JSON，而空 stdout 不是：抛到顶层的错误（源解析失败、
