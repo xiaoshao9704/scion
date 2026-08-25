@@ -92,6 +92,13 @@ that fails.
 | `1` | `sync <name>` was given a name that is not in the ledger. |
 | `2` / `3` / `5` | Propagated from the underlying `install`. |
 
+### `scion uninstall`
+
+| Code | Meaning |
+|---|---|
+| `0` | Every matching record was undone: deregistered on the target, catalog entry and converted files removed, ledger updated. A target-side deregistration that fails because the plugin was already removed by hand is reported and does not fail the run — cleaning up after exactly that drift is part of the job. |
+| `1` | Usage error: no plugin name, or the name (with the optional `--to` filter) matches nothing in the ledger. The output lists what is installed. Nothing was changed. |
+
 ### `scion list`
 
 | Code | Meaning |

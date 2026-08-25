@@ -93,6 +93,39 @@ export async function catalogEntryOp(
  * 键名 name）和 kimi（字符串形态 source，键名 id）两种 catalog 格式——条目形状本身
  * 复用 marketplace/project.ts 的 projectEntry()，不重新实现一遍字段映射规则。
  */
+/**
+ * 从 pluginRoot 反推这次安装挂在哪个市场名下。安装时的布局是
+ * `<home>/.scion/markets/<market>/<target>/plugins/<name>`；不匹配（比如账本被手工
+ * 改过）返回 null，调用方按"不知道市场"处理，不要瞎猜。
+ */
+export function marketNameFromPluginRoot(home: string, pluginRoot: string): string | null {
+  const prefix = join(home, '.scion', 'markets') + '/';
+  if (!pluginRoot.startsWith(prefix)) return null;
+  const [market] = pluginRoot.slice(prefix.length).split('/');
+  return market || null;
+}
+
+/** 从 catalog 删一个条目；catalog 不存在或条目不在时不写任何东西 */
+export async function removeMarketplaceEntry(
+  marketplaceRoot: string,
+  target: EcosystemProfile,
+  name: string,
+  now: () => Date = () => new Date(),
+): Promise<boolean> {
+  const abs = catalogPathFor(marketplaceRoot, target);
+  const existing = await readCatalog(abs, target);
+  if (existing === null) return false;
+  const key = target.marketplaceDialect.entryKeyField;
+  const plugins = existing.plugins;
+  if (!Array.isArray(plugins)) return false;
+  const next = plugins.filter((p) => (p as Record<string, unknown>)[key] !== name);
+  if (next.length === plugins.length) return false;
+  existing.plugins = next;
+  await backupFile(abs, now().toISOString().replace(/[:.]/g, '-'));
+  await atomicWriteJson(abs, existing);
+  return true;
+}
+
 export async function upsertMarketplaceEntry(
   marketplaceRoot: string,
   marketplaceName: string,

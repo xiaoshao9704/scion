@@ -34,6 +34,47 @@ describe('runList', () => {
     expect(text).toContain('obra/superpowers');
     expect(text).toContain('not registered');
   });
+
+  it('flags a registered codex record the target no longer has (drift)', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'scion-home-'));
+    await recordInstall(home, {
+      name: 'demo',
+      target: 'codex',
+      source: '/src/demo',
+      sourceKind: 'path',
+      pluginRoot: join(home, '.scion/markets/scion/codex/plugins/demo'),
+      registered: true,
+    });
+    // 没有 ~/.codex/config.toml，也就没有 [plugins."demo@scion"] —— 目标端没有这个插件
+    const out: string[] = [];
+    await runList([], { write: (s) => out.push(s) }, { home });
+    expect(out.join('')).toMatch(/gone on codex/);
+  });
+
+  it('does not flag a registered kimi record the registry still has', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'scion-home-'));
+    const pluginRoot = join(home, '.scion/markets/scion/kimi/plugins/demo');
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const registryPath = join(home, '.kimi-code/plugins/installed.json');
+    await mkdir(join(home, '.kimi-code/plugins'), { recursive: true });
+    await writeFile(
+      registryPath,
+      JSON.stringify({ version: 1, plugins: [{ id: 'demo', root: pluginRoot, source: 'local-path', enabled: true, installedAt: 'x', updatedAt: 'x' }] }),
+    );
+    await recordInstall(home, {
+      name: 'demo',
+      target: 'kimi',
+      source: '/src/demo',
+      sourceKind: 'path',
+      pluginRoot,
+      registered: true,
+    });
+    const out: string[] = [];
+    await runList([], { write: (s) => out.push(s) }, { home });
+    const text = out.join('');
+    expect(text).toContain('[registered]');
+    expect(text).not.toMatch(/gone on/);
+  });
 });
 
 describe('runSync', () => {

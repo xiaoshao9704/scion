@@ -27,6 +27,7 @@ const SOURCES: CommandSource[] = [
   { file: 'src/commands/doctor.ts', sections: ['`scion doctor`'] },
   { file: 'src/commands/convert.ts', sections: ['`scion convert`'] },
   { file: 'src/commands/install.ts', sections: ['`scion install`'] },
+  { file: 'src/commands/uninstall.ts', sections: ['`scion uninstall`'] },
   { file: 'src/commands/list.ts', sections: ['`scion list`'] },
   {
     file: 'src/commands/market.ts',

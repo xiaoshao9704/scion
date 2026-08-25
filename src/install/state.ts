@@ -81,6 +81,24 @@ export async function readState(home: string): Promise<InstallRecord[]> {
   return parseState(raw, path);
 }
 
+/** 从账本移除一条记录；账本不存在或记录不在时不写任何东西，返回是否真的移除了 */
+export async function removeInstall(
+  home: string,
+  name: string,
+  target: EcosystemId,
+  now: () => Date = () => new Date(),
+): Promise<boolean> {
+  const path = statePath(home);
+  const raw = await readRaw(path);
+  if (raw === null) return false;
+  const installs = parseState(raw, path);
+  const next = installs.filter((r) => !(r.name === name && r.target === target));
+  if (next.length === installs.length) return false;
+  await backupFile(path, now().toISOString().replace(/[:.]/g, '-'));
+  await atomicWriteJson(path, { version: 1, installs: next });
+  return true;
+}
+
 export async function recordInstall(
   home: string,
   record: Omit<InstallRecord, 'installedAt' | 'updatedAt'>,

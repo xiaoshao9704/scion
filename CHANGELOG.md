@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- **Hooks now convert from Claude to Kimi.** Measured against the Kimi binary:
+  its hook event set is a strict superset of Claude's with identical names, and
+  plugin hooks run with the plugin root as cwd. `hooks/hooks.json` flattens
+  into the `hooks` array of `kimi.plugin.json`; `${CLAUDE_PLUGIN_ROOT}` becomes
+  a relative path (INFO), timeouts clamp to Kimi's 1–600s range and dropped
+  `async` / `shell` fields are each reported as a LOSS. Codex hooks stay
+  report-only until its plugin-level declaration is verified.
+- **New command: `scion uninstall <name> [--to codex,kimi]`** — deregisters on
+  the target (`codex plugin remove` / the Kimi registry, with backup), removes
+  the catalog entry and converted files, and forgets the ledger record. A
+  target already cleaned up by hand is reported and does not fail the run.
+- **`scion list` now detects drift**: a record the ledger says is registered
+  but the target no longer has (removed behind scion's back) is flagged, with
+  `missingOnTarget: true` in `--json`.
+
 ## 0.1.1 — 2026-08-25
 
 Verified two ecosystem facts against the real binaries (codex-cli 0.133.0,

@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { runDoctor } from './commands/doctor.js';
 import { runConvert } from './commands/convert.js';
 import { runInstall } from './commands/install.js';
+import { runUninstall } from './commands/uninstall.js';
 import { runList } from './commands/list.js';
 import { runSync } from './commands/sync.js';
 import { runMarket } from './commands/market.js';
@@ -15,7 +16,7 @@ export interface CliIo {
   write: (s: string) => void;
 }
 
-const COMMANDS = ['install', 'convert', 'doctor', 'list', 'sync', 'market'] as const;
+const COMMANDS = ['install', 'uninstall', 'convert', 'doctor', 'list', 'sync', 'market'] as const;
 
 function isCommand(s: string): s is (typeof COMMANDS)[number] {
   return (COMMANDS as readonly string[]).includes(s);
@@ -46,6 +47,8 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     switch (first) {
       case 'install':
         return await runInstall(rest, io);
+      case 'uninstall':
+        return await runUninstall(rest, io);
       case 'doctor':
         return await runDoctor(rest, io);
       case 'convert':
@@ -73,6 +76,7 @@ function usage(): string {
     '  install <github|path|zip> --to codex,kimi   fetch → convert → install → write registry',
     '  install <plugin>@<marketplace> --to kimi    same, for one entry of a marketplace you have',
     '    [--dry-run]                               preview the actions only; change nothing',
+    '  uninstall <name> [--to codex,kimi]          undo an install: deregister, drop files, forget',
     '  convert <dir> --to kimi [-o <dir>]          convert only, do not install',
     '  doctor <dir> [--to kimi]                    compatibility report',
     '  list                                        installed plugins',

@@ -39,6 +39,7 @@ Node 20+. Or run it without installing: `npx @xiaoshao9704/scion <command>`.
 scion install <github|path|zip> --to codex,kimi   fetch → convert → install → write registry
 scion install <plugin>@<marketplace> --to kimi    same, for one entry of a marketplace you have
   [--dry-run]                                     preview the actions only; change nothing
+scion uninstall <name> [--to codex,kimi]          undo an install: deregister, drop files, forget
 scion convert <dir> --to kimi [-o <dir>]          convert only, do not install
 scion doctor <dir> [--to kimi]                    compatibility report
 scion list                                        installed plugins
@@ -105,16 +106,19 @@ already set up. `--env-name OLD=OLD` goes back to the author's name.
 `--env-name <plugin>:OLD=NEW`. The same variable name in two plugins is not
 necessarily the same secret.
 
-## What v1 converts
+## What scion converts
 
-Metadata, `interface` / presentation fields, skills, commands, agents and MCP
-servers, from Claude to Kimi and Claude to Codex.
+Metadata, `interface` / presentation fields, skills, commands, agents, MCP
+servers and hooks, from Claude to Kimi; everything except hooks from Claude to
+Codex.
 
-**Reported but not converted: hooks.** Hooks run shell commands. Getting one
-wrong does not mean it stops working — it means it runs the wrong thing. The
-three event models do not map one-to-one, and a missing event on the target
-either never fires or fires at the wrong moment. `doctor` surfaces them; a
-conversion waits for measured evidence.
+**Hooks convert to Kimi because the mapping is measured, not guessed.** Kimi's
+hook event set is a strict superset of Claude's with identical names, and its
+plugin hooks run with the plugin root as the working directory — so the
+conversion is a structural rewrite, with every dropped detail (`async`,
+`shell`, an out-of-range timeout) reported as a LOSS. Codex hooks stay
+report-only: how a Codex *plugin* declares hooks is still unverified, and a
+hook that fires at the wrong moment does not fail, it runs the wrong thing.
 
 Not supported: runtime shims, and the reverse direction (Kimi or Codex back to
 Claude).

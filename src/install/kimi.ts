@@ -70,6 +70,21 @@ async function readKimiRegistry(path: string): Promise<KimiRegistry | null> {
   return registry;
 }
 
+/** 从 Kimi 注册表删掉一个插件条目；文件不存在或条目不在时不写任何东西 */
+export async function removeFromKimiRegistry(
+  registryPath: string,
+  id: string,
+  now: () => Date = () => new Date(),
+): Promise<boolean> {
+  const registry = await readKimiRegistry(registryPath);
+  if (registry === null) return false;
+  const next = registry.plugins.filter((p) => p.id !== id);
+  if (next.length === registry.plugins.length) return false;
+  await backupFile(registryPath, now().toISOString().replace(/[:.]/g, '-'));
+  await atomicWriteJson(registryPath, { ...registry, plugins: next });
+  return true;
+}
+
 export const kimiInstaller: Installer = {
   target: 'kimi',
 
