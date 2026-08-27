@@ -191,6 +191,11 @@ export interface EcosystemProfile {
   /** name 的正则约束（源字符串）；undefined 表示无约束 */
   namePattern?: string;
   limits: { fieldBytes?: number; totalInstructionBytes?: number };
-  install: InstallSpec;
-  marketplaceDialect: MarketplaceDialect;
+  /**
+   * 三种操作（安装 / 市场转换 / 仓库内翻译）按需实现：不声明 install 的生态不能
+   * 作为 install/sync/uninstall 的目标，不声明 marketplaceDialect 的不能做市场转换；
+   * 仓库内翻译只要有 manifestPaths 就支持。命令层用 requireOperation 把关。
+   */
+  install?: InstallSpec;
+  marketplaceDialect?: MarketplaceDialect;
 }

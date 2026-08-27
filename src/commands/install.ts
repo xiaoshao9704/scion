@@ -5,7 +5,7 @@ import type { CliIo } from '../cli.js';
 import type { EcosystemId, Finding } from '../ir/types.js';
 import type { Runner } from '../install/exec.js';
 import { normalize, isSafePathSegment } from '../normalize/index.js';
-import { loadProfile } from '../profiles/loader.js';
+import { installSpec, loadProfile, requireOperation } from '../profiles/loader.js';
 import { doctor, worstLevel } from '../doctor/index.js';
 import { formatEnvVars, formatFindings } from '../doctor/report.js';
 import {
@@ -224,6 +224,7 @@ export async function runInstall(
   }
 
   for (const target of targets) {
+    requireOperation(loadProfile(target), 'install');
     const { findings, envVars } = await doctor(ir, loadProfile(target), { envNames });
     report.targets.push({ target, findings, envVars });
 
@@ -506,7 +507,7 @@ function installerFor(target: EcosystemId): Installer {
     case 'kimi':
       return kimiInstaller;
     case 'claude': {
-      const strategy = loadProfile('claude').install.strategy;
+      const strategy = installSpec(loadProfile('claude')).strategy;
       if (strategy.kind !== 'unsupported') {
         throw new Error('claude profile must use the unsupported strategy');
       }

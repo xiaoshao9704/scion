@@ -5,6 +5,7 @@ import type { EcosystemProfile } from '../profiles/types.js';
 import type { Finding } from '../ir/types.js';
 import type { MarketplaceEntryIR } from '../marketplace/types.js';
 import { projectEntry } from '../marketplace/project.js';
+import { marketDialect } from '../profiles/loader.js';
 
 /**
  * 这次安装实际用哪个市场名，以及它对应的根目录。两个 installer 共用这一份，
@@ -24,7 +25,7 @@ export function marketPlacement(
 
 /** catalog 的绝对路径。dialect 的候选路径按优先级排，写入端只认第一个。 */
 export function catalogPathFor(marketplaceRoot: string, target: EcosystemProfile): string {
-  return join(marketplaceRoot, target.marketplaceDialect.catalogPaths[0]);
+  return join(marketplaceRoot, marketDialect(target).catalogPaths[0]);
 }
 
 /**
@@ -83,7 +84,7 @@ export async function catalogEntryOp(
   const file = await readCatalog(catalogPathFor(marketplaceRoot, target), target);
   if (file === null) return 'add';
   const plugins = file.plugins as Record<string, unknown>[];
-  return plugins.some((p) => p[target.marketplaceDialect.entryKeyField] === entryName)
+  return plugins.some((p) => p[marketDialect(target).entryKeyField] === entryName)
     ? 'update'
     : 'add';
 }
@@ -115,7 +116,7 @@ export async function removeMarketplaceEntry(
   const abs = catalogPathFor(marketplaceRoot, target);
   const existing = await readCatalog(abs, target);
   if (existing === null) return false;
-  const key = target.marketplaceDialect.entryKeyField;
+  const key = marketDialect(target).entryKeyField;
   const plugins = existing.plugins;
   if (!Array.isArray(plugins)) return false;
   const next = plugins.filter((p) => (p as Record<string, unknown>)[key] !== name);
@@ -133,7 +134,7 @@ export async function upsertMarketplaceEntry(
   entry: { name: string; category?: string },
   now: () => Date = () => new Date(),
 ): Promise<void> {
-  const dialect = target.marketplaceDialect;
+  const dialect = marketDialect(target);
   const abs = catalogPathFor(marketplaceRoot, target);
 
   const existing = await readCatalog(abs, target);

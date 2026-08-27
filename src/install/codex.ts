@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { PluginIR } from '../ir/types.js';
-import { loadProfile } from '../profiles/loader.js';
+import { installSpec, loadProfile } from '../profiles/loader.js';
 import { projectAll } from '../project/index.js';
 import { planEmitFiles } from '../emit/write.js';
 import { catalogEntryOp, catalogPathFor, marketPlacement } from './marketplace.js';
@@ -16,7 +16,7 @@ export const codexInstaller: Installer = {
 
   async preview(ir: PluginIR, opts: InstallOpts): Promise<InstallPlan> {
     const profile = loadProfile('codex');
-    const strategy = profile.install.strategy;
+    const strategy = installSpec(profile).strategy;
     if (strategy.kind !== 'codex-cli') throw new Error('codex profile must use the codex-cli strategy');
 
     const market = marketPlacement(opts.home, strategy, opts.marketName);

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **New command: `scion repo <dir> --to codex,kimi [--check]`** — author mode.
+  Writes the target manifests and derivative files (e.g.
+  `hooks/codex-hooks.json`) into the plugin's own repository, replacing the
+  hand-maintained per-ecosystem copies. Shared bodies are never rewritten;
+  body-level losses stay in the report as guidance. `--check` exits `6` when
+  committed manifests drift from what scion would generate, for CI.
+- **Per-ecosystem operations are now opt-in.** `install` and
+  `marketplaceDialect` are optional in a profile: an ecosystem can implement
+  any subset of install / market conversion / in-repo translation, and the
+  commands it does not support fail with a clear message naming what it does.
+
 ## 0.1.2 — 2026-08-25
 
 - **Hooks now convert from Claude to Kimi.** Measured against the Kimi binary:

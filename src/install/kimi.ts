@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PluginIR } from '../ir/types.js';
-import { loadProfile } from '../profiles/loader.js';
+import { installSpec, loadProfile } from '../profiles/loader.js';
 import { projectAll } from '../project/index.js';
 import { planEmitFiles } from '../emit/write.js';
 import { atomicWriteJson, backupFile } from './atomic.js';
@@ -90,7 +90,7 @@ export const kimiInstaller: Installer = {
 
   async preview(ir: PluginIR, opts: InstallOpts): Promise<InstallPlan> {
     const profile = loadProfile('kimi');
-    const strategy = profile.install.strategy;
+    const strategy = installSpec(profile).strategy;
     if (strategy.kind !== 'kimi-managed') throw new Error('kimi profile must use the kimi-managed strategy');
 
     const projected = await projectAll(ir, profile, { envNames: opts.envNames });

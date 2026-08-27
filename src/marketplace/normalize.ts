@@ -3,6 +3,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import type { EcosystemProfile } from '../profiles/types.js';
 import type { MarketplaceEntryIR, MarketplaceEntrySource, MarketplaceIR } from './types.js';
 import { isSafePathSegment } from '../normalize/index.js';
+import { marketDialect } from '../profiles/loader.js';
 
 function str(record: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
@@ -70,13 +71,13 @@ async function locateCatalog(
   const info = await stat(abs).catch(() => null);
 
   if (info?.isFile()) {
-    const rel = profile.marketplaceDialect.catalogPaths.find((p) => abs.endsWith(p));
+    const rel = marketDialect(profile).catalogPaths.find((p) => abs.endsWith(p));
     // 直接给文件时，root 是去掉 catalog 相对路径后的那一层
     const root = rel ? abs.slice(0, abs.length - rel.length - 1) : dirname(abs);
     return { catalogPath: abs, root: root || dirname(abs) };
   }
 
-  for (const rel of profile.marketplaceDialect.catalogPaths) {
+  for (const rel of marketDialect(profile).catalogPaths) {
     const candidate = join(abs, rel);
     if ((await stat(candidate).catch(() => null))?.isFile()) {
       return { catalogPath: candidate, root: abs };
@@ -89,7 +90,7 @@ export async function normalizeMarketplace(
   target: string,
   profile: EcosystemProfile,
 ): Promise<MarketplaceIR> {
-  const dialect = profile.marketplaceDialect;
+  const dialect = marketDialect(profile);
   const located = await locateCatalog(target, profile);
   if (!located) {
     throw new Error(

@@ -17,6 +17,7 @@ see [Codes that are easy to confuse](#codes-that-are-easy-to-confuse).
 | `3` | LOSS findings that need explicit acceptance; re-run with `--yes`. Nothing was written. | `install` |
 | `4` | Finished, but the output is **incomplete**: some catalog entries were excluded. | `market convert` |
 | `5` | An install failed and was **rolled back**; the target is back in its pre-install state. | `install` |
+| `6` | `--check` found **drift**: committed in-repo manifests differ from what scion would generate. Nothing was written. | `repo` |
 
 ## Per command
 
@@ -91,6 +92,18 @@ that fails.
 | `0` | Everything synced, or the ledger is empty (`sync` with no argument). |
 | `1` | `sync <name>` was given a name that is not in the ledger. |
 | `2` / `3` / `5` | Propagated from the underlying `install`. |
+
+### `scion repo`
+
+| Code | Meaning |
+|---|---|
+| `0` | Every target's manifests were written into the repo — or, with `--check`, they all matched. |
+| `1` | Usage error: no directory, no `--to`, or an unknown ecosystem. Nothing was written. |
+| `2` | BLOCK findings on some target; nothing was written for any target. |
+| `6` | `--check` only: at least one committed manifest differs from what scion would generate. The output lists each drifted file. Nothing was written — re-run without `--check` to regenerate. |
+
+`6` exists so CI can branch on "the repo's manifests rotted" specifically; it is
+the author-mode cousin of the drift that `scion list` reports for installs.
 
 ### `scion uninstall`
 

@@ -44,6 +44,7 @@ scion convert <dir> --to kimi [-o <dir>]          convert only, do not install
 scion doctor <dir> [--to kimi]                    compatibility report
 scion list                                        installed plugins
 scion sync [<name>]                               re-convert and reinstall after upstream changes
+scion repo <dir> --to codex,kimi [--check]        write target manifests into the plugin repo itself
 scion market convert <dir> --to kimi|codex        convert a whole marketplace (registers nothing)
 scion market show <dir>                           show a marketplace overview
 
@@ -132,12 +133,29 @@ marketplace converted with entries excluded, `5` an install that failed and was
 rolled back. They are per command, and `4` and `5` are close to opposites — see
 [docs/exit-codes.md](docs/exit-codes.md) before branching on them.
 
+## Author mode: `scion repo`
+
+`scion repo <dir> --to codex,kimi` is for plugin *authors*: instead of
+converting a copy, it writes the target manifests (and derivative files like
+`hooks/codex-hooks.json`) into the plugin's own git repository — the files
+authors hand-maintain today. Shared bodies (skills, commands, agents) are
+never rewritten; body-level losses show up in the report so you fix the
+source once for every ecosystem. `--check` regenerates in memory and exits
+`6` when the committed manifests drift — put it in CI and manifest rot
+becomes a failing build instead of a silent lie.
+
 ## Adding an ecosystem
 
 An ecosystem is a declarative profile: manifest paths, directory conventions,
 field dialect, frontmatter map, path variables, naming rules, install location,
 and the tool-name mapping table. Adding one means adding a profile, not changing
 the engine.
+
+The three operations are opt-in per profile: declaring `install` enables
+`scion install / sync / uninstall`, declaring `marketplaceDialect` enables
+`scion market`, and `manifestPaths` alone enables `scion repo`. A profile that
+implements only what its ecosystem actually supports gets a clear error for
+the rest, not a broken conversion.
 
 ## License
 

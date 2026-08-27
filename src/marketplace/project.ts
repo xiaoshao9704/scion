@@ -7,7 +7,7 @@ import { normalize } from '../normalize/index.js';
 import { projectAll } from '../project/index.js';
 import { emit, isInsideRoot } from '../emit/write.js';
 import { doctor, worstLevel } from '../doctor/index.js';
-import { loadProfile } from '../profiles/loader.js';
+import { marketDialect, loadProfile } from '../profiles/loader.js';
 import { canSelfFetch } from './remote.js';
 
 export interface MarketplaceProjection {
@@ -28,7 +28,7 @@ export function projectEntry(
   target: EcosystemProfile,
   findings: Finding[],
 ): Record<string, unknown> {
-  const dialect = target.marketplaceDialect;
+  const dialect = marketDialect(target);
   const out: Record<string, unknown> = {};
 
   out[dialect.entryKeyField] = entry.name;
@@ -95,7 +95,7 @@ export function projectMarketplace(
   mp: MarketplaceIR,
   target: EcosystemProfile,
 ): MarketplaceProjection {
-  const dialect = target.marketplaceDialect;
+  const dialect = marketDialect(target);
   const findings: Finding[] = [...mp.issues];
   const catalog: Record<string, unknown> = {};
 
@@ -138,7 +138,7 @@ export async function emitMarketplace(
   /** 按插件分开的环境变量改名。一个市场里几十个插件，映射必然是按插件给的 */
   envNamesByPlugin: Map<string, Map<string, string>> = new Map(),
 ): Promise<MarketplaceEmitResult> {
-  const dialect = target.marketplaceDialect;
+  const dialect = marketDialect(target);
   const projection = projectMarketplace(mp, target);
   const findings: Finding[] = [...projection.findings];
   const converted: string[] = [];
@@ -157,7 +157,7 @@ export async function emitMarketplace(
           code: 'marketplace.remote-entry-unfetchable',
           message:
             `entry "${entry.name}" points at a remote source (${entry.source.url}) that ${target.id} cannot fetch itself` +
-            `${target.marketplaceDialect.remoteFetch.limitation ? `: ${target.marketplaceDialect.remoteFetch.limitation}` : ''}. ` +
+            `${dialect.remoteFetch.limitation ? `: ${dialect.remoteFetch.limitation}` : ''}. ` +
             `Keeping it would put an entry in the catalog that ${target.id} can never install, so it was dropped from the output catalog; the rest still convert`,
           // where 用条目名，与其余条目级 BLOCK 一致——market convert 的排除汇总按 where
           // 的首段分组，放 URL 进去会被 "https:" 的冒号切开，错误地把所有远端条目并成一组。

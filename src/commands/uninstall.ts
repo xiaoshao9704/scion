@@ -7,7 +7,7 @@ import { execRunner, runOrThrow, type Runner } from '../install/exec.js';
 import { marketNameFromPluginRoot, removeMarketplaceEntry } from '../install/marketplace.js';
 import { removeFromKimiRegistry } from '../install/kimi.js';
 import { readState, removeInstall, type InstallRecord } from '../install/state.js';
-import { loadProfile } from '../profiles/loader.js';
+import { installSpec, loadProfile } from '../profiles/loader.js';
 import { writeResult, usageError } from '../output/result.js';
 
 export async function runUninstall(
@@ -81,7 +81,7 @@ async function uninstallRecord(record: InstallRecord, home: string, run: Runner)
   }
 
   if (record.target === 'kimi' && record.registered) {
-    const strategy = profile.install.strategy;
+    const strategy = installSpec(profile).strategy;
     if (strategy.kind === 'kimi-managed') {
       const registryPath = join(home, strategy.registryPath);
       const removed = await removeFromKimiRegistry(registryPath, record.name);

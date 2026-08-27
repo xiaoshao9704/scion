@@ -7,7 +7,7 @@ import type { MarketplaceIR } from '../marketplace/types.js';
 import { ENTRY_SCOPED_BLOCK_CODES } from '../marketplace/types.js';
 import type { Runner } from '../install/exec.js';
 import { execRunner, runOrThrow } from '../install/exec.js';
-import { loadProfile } from '../profiles/loader.js';
+import { requireOperation, loadProfile } from '../profiles/loader.js';
 import { normalizeMarketplace } from '../marketplace/normalize.js';
 import { emitMarketplace, projectMarketplace } from '../marketplace/project.js';
 import { isSafePathSegment } from '../normalize/index.js';
@@ -138,6 +138,7 @@ export async function runMarket(
 
   if (!values.to) return writeResult(io, json, usageError('market convert', USAGE));
   const targetProfile = loadProfile(parseEcosystem(values.to));
+  requireOperation(targetProfile, 'market');
 
   // 改名只发生在转换时：不传 --as 时产物保持原名（模式 B，写回市场自己的仓库要求原名不变）；
   // 传 --as 时把新名字写进产物（模式 A，安装到消费者自己的注册表）。两种用法在同一件产物上互斥，

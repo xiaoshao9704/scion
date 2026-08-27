@@ -10,13 +10,14 @@ import { runUninstall } from './commands/uninstall.js';
 import { runList } from './commands/list.js';
 import { runSync } from './commands/sync.js';
 import { runMarket } from './commands/market.js';
+import { runRepo } from './commands/repo.js';
 import { runtimeError, usageError, writeResult } from './output/result.js';
 
 export interface CliIo {
   write: (s: string) => void;
 }
 
-const COMMANDS = ['install', 'uninstall', 'convert', 'doctor', 'list', 'sync', 'market'] as const;
+const COMMANDS = ['install', 'uninstall', 'convert', 'doctor', 'list', 'sync', 'market', 'repo'] as const;
 
 function isCommand(s: string): s is (typeof COMMANDS)[number] {
   return (COMMANDS as readonly string[]).includes(s);
@@ -59,6 +60,8 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
         return await runSync(rest, io);
       case 'market':
         return await runMarket(rest, io);
+      case 'repo':
+        return await runRepo(rest, io);
     }
   } catch (err) {
     // --json 下 stdout 必须是合法 JSON，而空 stdout 不是：抛到顶层的错误（源解析失败、
@@ -81,6 +84,7 @@ function usage(): string {
     '  doctor <dir> [--to kimi]                    compatibility report',
     '  list                                        installed plugins',
     '  sync [<name>]                               re-convert and reinstall after upstream changes',
+    '  repo <dir> --to codex,kimi [--check]        write target manifests into the plugin repo itself',
     '  market convert <dir> --to kimi|codex        convert a whole marketplace (registers nothing)',
     '  market show <dir>                           show a marketplace overview',
     '',

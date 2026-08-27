@@ -1,5 +1,6 @@
 import type { EcosystemProfile } from '../profiles/types.js';
 import type { MarketplaceEntrySource } from './types.js';
+import { marketDialect } from '../profiles/loader.js';
 
 /**
  * 从条目源的 URL 里取主机名。除了标准 URL，还认 scp 形态的 git 地址
@@ -31,7 +32,7 @@ export function canSelfFetch(target: EcosystemProfile, source: MarketplaceEntryS
   const url = remoteUrlOf(source);
   if (url === null) return true; // 本地条目不需要谁去拉
 
-  const { hosts } = target.marketplaceDialect.remoteFetch;
+  const { hosts } = marketDialect(target).remoteFetch;
   if (hosts.includes('*')) return true;
 
   const host = hostOf(url);

@@ -269,3 +269,20 @@ not registered）。
 因此 Claude → Codex 的 hooks 转换是**过滤加透传**：滤掉两个目标没有的事件（LOSS）、
 改写路径变量，其余原样写成 hooks/codex-hooks.json，清单指过去。三个生态的 hooks
 至此全部打通，v1 当年最大的推迟项关闭。
+
+## 范围修订（2026-08-27）：仓库内翻译从非目标转为正式能力
+
+原「非目标」第一条——"不产出可提交回仓库的多生态清单（那是插件作者视角）"——
+经维护者决定撤销。作者视角正是 superpowers / member-skills 这类真实仓库手工维护
+多份清单并腐烂的地方，工具没理由把它排除在外。
+
+落地为 `scion repo <dir> --to <targets> [--check]`：
+
+- 只写清单与派生文件（`hooks/codex-hooks.json` 等）进仓库本身；正文
+  （skills / commands / agents）各生态共享，不写副本——正文层面的损耗留在报告里，
+  作者改源头一处，所有生态受益。
+- `--check` 内存中重新生成并与已提交文件对比，漂移退出码 6——metrics-monitor
+  那种 name/version 漂移从此可以在 CI 里变成红灯。
+- 三种操作（install / market / in-repo）按 profile 声明按需实现：`install` 与
+  `marketplaceDialect` 改为可选字段，命令层 requireOperation 把关，未实现的操作
+  报出该生态支持什么，而不是给一个坏掉的转换。

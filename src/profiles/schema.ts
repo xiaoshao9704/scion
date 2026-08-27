@@ -76,7 +76,7 @@ export const EcosystemProfileSchema = z.object({
       }),
       z.object({ kind: z.literal('unsupported'), reason: z.string() }),
     ]),
-  }),
+  }).optional(),
   marketplaceDialect: z.object({
     catalogPaths: z.array(z.string()).min(1),
     nameField: z.string().nullable(),
@@ -89,7 +89,7 @@ export const EcosystemProfileSchema = z.object({
       hosts: z.array(z.string()).min(1),
       limitation: z.string(),
     }),
-  }),
+  }).optional(),
 });
 
 export function assertProfile(value: unknown): EcosystemProfile {
